@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>بازیابی اطلاعات مشتریار</title>
+<style>
+body{font-family:Tahoma,Arial,sans-serif;background:#f5f7fb;color:#172033;margin:0;padding:20px;line-height:1.9}main{max-width:720px;margin:auto;background:white;padding:22px;border-radius:16px;box-shadow:0 4px 24px #0001}h2{margin-top:0}button{border:0;border-radius:10px;padding:12px 18px;background:#1459c7;color:white;font-size:16px;margin:8px 0;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f3f7;padding:12px;border-radius:8px} .warn{color:#9b3b00;background:#fff2e8;padding:12px;border-radius:8px}
+</style></head>
+<body><main>
+<h2>بررسی اطلاعات ذخیره‌شدهٔ مشتریار</h2>
+<p>این صفحه فقط اطلاعات ذخیره‌شده در مرورگر همین دستگاه و همین دامنه را می‌خواند. چیزی را حذف یا تغییر نمی‌دهد و اطلاعات را به اینترنت ارسال نمی‌کند.</p>
+<p class="warn">اگر اطلاعاتی پیدا شد، با دکمهٔ زیر یک فایل پشتیبان روی گوشی ذخیره کن. این فایل را برای کسی ارسال نکن.</p>
+<button id="scan">بررسی اطلاعات</button>
+<div id="result">هنوز بررسی انجام نشده است.</div>
+<button id="backup" hidden>دانلود نسخهٔ پشتیبان</button>
+<script>
+let report=null;
+function scan(){
+ const items=[];
+ for(let i=0;i<localStorage.length;i++){
+  const key=localStorage.key(i); let value=localStorage.getItem(key);
+  let parsed=null, validJson=false, count=null;
+  try{parsed=JSON.parse(value);validJson=true;if(Array.isArray(parsed))count=parsed.length;else if(parsed&&typeof parsed==='object')count=Object.keys(parsed).length;}catch(e){}
+  items.push({key,bytes:new Blob([value]).size,validJson,arrayOrObjectItems:count,value});
+ }
+ report={createdAt:new Date().toISOString(),origin:location.origin,items};
+ const target=items.filter(x=>/mosht|vendor|booking|store|salon/i.test(x.key));
+ let html='<h3>نتیجه</h3><p>تعداد کل کلیدهای ذخیره‌شده: '+items.length+'</p>';
+ if(!target.length) html+='<p>کلیدی با نام مرتبط با مشتریار پیدا نشد. با این حال، نسخهٔ پشتیبان همهٔ اطلاعات برای بررسی بیشتر قابل دریافت است.</p>';
+ target.forEach(x=>{html+='<pre>نام: '+escapeHtml(x.key)+'\nحجم: '+x.bytes+' بایت\n'+(x.validJson?'تعداد موارد: '+(x.arrayOrObjectItems===null?'نامشخص':x.arrayOrObjectItems):'قالب: متن')+'\nنمونه: '+escapeHtml(x.value.slice(0,500))+'</pre>';});
+ document.getElementById('result').innerHTML=html;
+ document.getElementById('backup').hidden=items.length===0;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+document.getElementById('scan').addEventListener('click',scan);
+document.getElementById('backup').addEventListener('click',()=>{if(!report)return;const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='moshtaryar-browser-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);});
+</script></main></body></html>
