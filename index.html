@@ -369,17 +369,9 @@ function localSaveAll(){
   }
 }
 async function saveAll(){
+  // Use the role-aware cloud saver defined below; never try to write every user's records.
+  if(typeof window.saveAll === 'function') return await window.saveAll();
   if(!localSaveAll()) return false;
-  if(cloudReady && window.MoshtaryarCloud.currentUser){
-    try{
-      await Promise.all(vendors.map(v=>window.MoshtaryarCloud.saveVendor(v)));
-      await Promise.all(bookings.map(b=>window.MoshtaryarCloud.saveBooking(b)));
-    }catch(e){
-      console.error(e);
-      alert('ذخیره محلی انجام شد، اما همگام‌سازی Firebase ناموفق بود. اطلاعات محلی حذف نشده است.');
-      return false;
-    }
-  }
   return true;
 }
 
@@ -549,12 +541,6 @@ function editVendor(id){
 }
 document.getElementById('vendorForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  if(!currentUser){
-    const msg=document.getElementById('vendorFormMsg');
-    msg.textContent='برای ثبت درخواست آرایشگری، ابتدا وارد حساب شو یا ثبت‌نام کن.';
-    showPage('auth');
-    return;
-  }
   const name=document.getElementById('nvName').value.trim();
   if(!name)return;
   const wasEditing=!!editingVendorId;
@@ -682,7 +668,12 @@ renderHome();renderVendors();populateSelects();renderPanel();
         for(const b of bookings.filter(x=>currentRole==='super_admin'||x.customerUid===currentUser.uid||vendors.some(v=>v.id===x.vendorId&&(v.managerUid===currentUser.uid||v.ownerUid===currentUser.uid)))) await window.MoshtaryarCloud.saveBooking(b);
       }
       return true;
-    }catch(e){console.error(e);alert('ذخیره محلی انجام شد، اما همگام‌سازی ابری ناموفق بود.');return false;}
+    }catch(e){
+      console.error('Moshtaryar cloud sync error:',e);
+      const detail=e?.code || e?.message || 'خطای نامشخص';
+      alert('ذخیره محلی انجام شد، اما همگام‌سازی ابری ناموفق بود. اطلاعات محلی حذف نشده است.\nعلت: '+detail);
+      return false;
+    }
   };
 
   window.loadCloudData=async function(){
@@ -690,8 +681,12 @@ renderHome();renderVendors();populateSelects();renderPanel();
     try{
       const p=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
       currentRole=normalizeRole(p?.role);
-      const vs=await window.MoshtaryarCloud.getVendors(currentRole);
-      vendors=vs.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
+      // Keep this user's locally saved pending applications if a previous cloud write failed.
+      const localPending=vendors.filter(v=>v.ownerUid===currentUser.uid && (v.status==='pending'||v.managerApplication));
+      const cloudVendors=await window.MoshtaryarCloud.getVendors(currentRole);
+      const merged=new Map(cloudVendors.map(v=>[v.id,{...v,services:(v.services||[]).map(normalizeService)}]));
+      for(const v of localPending) if(!merged.has(v.id)) merged.set(v.id,v);
+      vendors=[...merged.values()];
       bookings=await window.MoshtaryarCloud.getBookings(currentRole,vendors);
       localSaveAll(); applyRoleUI(); renderHome(); renderVendors(); populateSelects(); renderPanel();
     }catch(e){console.error(e);document.getElementById('authMsg').textContent='ورود انجام شد، اما اطلاعات ابری خوانده نشد. Rules و تنظیمات Firebase را بررسی کن.';}
