@@ -103,7 +103,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 <section id="page-new-vendor" class="page">
  <div class="section-title"><h2 id="vendorFormTitle">ثبت فروشندهٔ جدید</h2></div>
  <form id="vendorForm" class="form-card">
-  <div class="notice">اطلاعات را وارد کن. برای خدمات چندگانه، هر خدمت را در یک خط بنویس؛ قالب هر خط: نام خدمت - قیمت (حتماً بین نام و قیمت خط تیره بگذار)</div>
+  <div class="notice">برای درخواست همکاری به‌عنوان آرایشگر، با حساب خود وارد شو و اطلاعات آرایشگاهت را ثبت کن. پس از تأیید سوپرادمین، نقش آرایشگر و دسترسی به همین فروشگاه خودکار فعال می‌شود. برای خدمات چندگانه، هر خدمت را در یک خط بنویس؛ قالب: نام خدمت - قیمت.</div>
   <div class="form-grid">
    <div class="full"><label for="nvName">نام فروشگاه یا کسب‌وکار *</label><input id="nvName" required maxlength="100" placeholder="مثلاً آرایشگاه بهار"></div>
    <div><label for="nvPhone">شماره تماس</label><input id="nvPhone" type="tel" placeholder="شماره تماس"></div>
@@ -184,7 +184,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, getDocs, query, where, serverTimestamp
+  collection, getDocs, query, where, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -275,6 +275,20 @@ async function getBookings(role, vs) {
   }
   return out;
 }
+async function approveVendorManager(vendor) {
+  if (!vendor?.id || !vendor?.ownerUid) throw new Error("درخواست آرایشگری اطلاعات مالک ندارد.");
+  const batch = writeBatch(db);
+  batch.set(doc(db,"users",vendor.ownerUid), {
+    uid:vendor.ownerUid, role:"store_manager",
+    updatedAt:serverTimestamp()
+  }, {merge:true});
+  batch.set(doc(db,"vendors",vendor.id), {
+    status:"approved", managerUid:vendor.ownerUid,
+    managerApplication:false, managerApprovedAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  }, {merge:true});
+  await batch.commit();
+}
 async function allUsers() {
   const s=await getDocs(collection(db,"users")); return s.docs.map(d=>({id:d.id,...d.data()}));
 }
@@ -297,6 +311,7 @@ window.MoshtaryarCloud = {
   saveBooking, updateBooking,
   deleteBooking:id=>deleteDoc(doc(db,"bookings",id)),
   updateUserRole:(uid,role)=>updateDoc(doc(db,"users",uid),{role,updatedAt:serverTimestamp()}),
+  approveVendorManager,
   exists:async(c,id)=>(await getDoc(doc(db,c,id))).exists()
 };
 
@@ -534,6 +549,12 @@ function editVendor(id){
 }
 document.getElementById('vendorForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  if(!currentUser){
+    const msg=document.getElementById('vendorFormMsg');
+    msg.textContent='برای ثبت درخواست آرایشگری، ابتدا وارد حساب شو یا ثبت‌نام کن.';
+    showPage('auth');
+    return;
+  }
   const name=document.getElementById('nvName').value.trim();
   if(!name)return;
   const wasEditing=!!editingVendorId;
@@ -554,7 +575,7 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
     if(!v){alert('فروشگاه برای ویرایش پیدا نشد.');return}
     Object.assign(v,data);
   }else{
-    v={id:'v-'+Date.now(),...data,ownerUid:currentUser?.uid||null,managerUid:null,status:'pending'};
+    v={id:'v-'+Date.now(),...data,ownerUid:currentUser?.uid||null,managerUid:currentRole==='store_manager'?(currentUser?.uid||null):null,status:'pending',managerApplication:currentRole==='customer'&&!!currentUser};
     vendors.push(v);
   }
   const savedId=v.id;
@@ -695,7 +716,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
   window.vendorCard=function(v){
     const canEdit=currentRole==='super_admin'||v.ownerUid===currentUser?.uid||v.managerUid===currentUser?.uid;
     const admin=currentRole==='super_admin';
-    return `<article class="card"><h3>${esc(v.name)}</h3><div class="info">📍 ${esc(v.address||'آدرس ثبت نشده')}</div>${distanceLabel(v)}<div class="info">☎️ ${esc(v.phone||'شماره ثبت نشده')}</div><div class="info">🕒 ${esc(v.hours||'ساعات کاری ثبت نشده')}</div><div class="info">وضعیت: ${esc(v.status||'pending')}</div><div class="services">${(v.services||[]).map(s=>`<div class="service-row"><span>${esc(s.name)}</span><span class="price">${esc(s.price||'استعلام')}</span></div>`).join('')||'<span class="muted">هنوز خدمتی ثبت نشده است.</span>'}</div><div class="btn-row"><button class="btn secondary" onclick="bookThis('${esc(v.id)}')">رزرو نوبت</button><button class="btn light" onclick="chatAbout('${esc(v.id)}')">سؤال از دستیار</button>${canEdit?`<button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>`:''}${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">تأیید</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button>`:''}</div></article>`;
+    return `<article class="card"><h3>${esc(v.name)}</h3><div class="info">📍 ${esc(v.address||'آدرس ثبت نشده')}</div>${distanceLabel(v)}<div class="info">☎️ ${esc(v.phone||'شماره ثبت نشده')}</div><div class="info">🕒 ${esc(v.hours||'ساعات کاری ثبت نشده')}</div><div class="info">وضعیت: ${esc(v.status||'pending')}</div><div class="services">${(v.services||[]).map(s=>`<div class="service-row"><span>${esc(s.name)}</span><span class="price">${esc(s.price||'استعلام')}</span></div>`).join('')||'<span class="muted">هنوز خدمتی ثبت نشده است.</span>'}</div><div class="btn-row"><button class="btn secondary" onclick="bookThis('${esc(v.id)}')">رزرو نوبت</button><button class="btn light" onclick="chatAbout('${esc(v.id)}')">سؤال از دستیار</button>${canEdit?`<button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>`:''}${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">${v.managerApplication?'تأیید آرایشگر و فروشگاه':'تأیید'}</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button>`:''}</div></article>`;
   };
 
   window.renderPanel=async function(){
@@ -709,7 +730,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
     }).join(''):'<div class="empty">نوبتی پیدا نشد.</div>';
 
     const mine=vendors.filter(v=>admin||v.ownerUid===currentUser.uid||v.managerUid===currentUser.uid);
-    document.getElementById('manageVendors').innerHTML=mine.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="muted">وضعیت: ${esc(v.status||'pending')} | مدیر: ${esc(v.managerUid||'تخصیص‌نیافته')}</div><div class="btn-row"><button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">تأیید</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button><button class="btn light" onclick="assignManagerPrompt('${esc(v.id)}')">تخصیص آرایشگر</button><button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button>`:''}</div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
+    document.getElementById('manageVendors').innerHTML=mine.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="muted">وضعیت: ${esc(v.status||'pending')} | مدیر: ${esc(v.managerUid||'تخصیص‌نیافته')}</div><div class="btn-row"><button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">${v.managerApplication?'تأیید آرایشگر و فروشگاه':'تأیید'}</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button><button class="btn light" onclick="assignManagerPrompt('${esc(v.id)}')">تخصیص آرایشگر</button><button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button>`:''}</div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
     if(admin) await renderAdminUsers();
   };
 
@@ -722,7 +743,20 @@ renderHome();renderVendors();populateSelects();renderPanel();
   window.setVendorStatus=async function(id,status){
     if(currentRole!=='super_admin')return alert('فقط سوپرادمین می‌تواند وضعیت فروشگاه را تغییر دهد.');
     const v=vendors.find(x=>x.id===id);if(!v)return;
-    v.status=status;await window.MoshtaryarCloud.updateVendor(v);localSaveAll();renderPanel();renderVendors();renderHome();
+    try{
+      if(status==='approved' && v.managerApplication && v.ownerUid){
+        await window.MoshtaryarCloud.approveVendorManager(v);
+        v.status='approved';v.managerUid=v.ownerUid;v.managerApplication=false;
+        alert('درخواست تأیید شد؛ نقش آرایشگر و دسترسی فروشگاه به‌صورت خودکار فعال شد.');
+      }else{
+        v.status=status;
+        await window.MoshtaryarCloud.updateVendor(v);
+      }
+      localSaveAll();renderPanel();renderVendors();renderHome();
+    }catch(e){
+      console.error(e);
+      alert('تأیید انجام نشد. اطلاعات قبلی حفظ شده‌اند؛ اتصال و قوانین Firestore را بررسی کن.');
+    }
   };
 
   window.renderAdminUsers=async function(){
