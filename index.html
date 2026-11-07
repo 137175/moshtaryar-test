@@ -738,12 +738,39 @@ renderHome();renderVendors();populateSelects();renderPanel();
   };
   window.assignManagerPrompt=async function(id){
     if(currentRole!=='super_admin')return;
+    const v=vendors.find(x=>x.id===id);if(!v)return;
     const ms=(await window.MoshtaryarCloud.getAllUsers()).filter(u=>normalizeRole(u.role)==='store_manager');
     if(!ms.length)return alert('ابتدا نقش یک کاربر را به «آرایشگر» تغییر بده.');
-    const answer=prompt(ms.map((u,i)=>`${i+1}. ${u.email||u.uid} — ${u.uid}`).join('\n')+'\n\nشماره مدیر:');
-    const idx=Number(answer)-1;if(!ms[idx])return;
-    const v=vendors.find(x=>x.id===id);if(!v)return;
-    v.managerUid=ms[idx].uid;await window.MoshtaryarCloud.updateVendor(v);localSaveAll();renderPanel();
+
+    const overlay=document.createElement('div');
+    overlay.className='confirm-overlay';
+    overlay.innerHTML=`<div class="confirm-box" role="dialog" aria-modal="true">
+      <h2>انتخاب آرایشگر</h2>
+      <p>آرایشگر موردنظر را از فهرست انتخاب کن:</p>
+      <select id="assignManagerSelect">${ms.map(u=>`<option value="${esc(u.uid)}">${esc(u.email||u.uid)}</option>`).join('')}</select>
+      <div class="btn-row">
+        <button type="button" class="btn" id="assignManagerConfirm">تخصیص</button>
+        <button type="button" class="btn secondary" id="assignManagerCancel">انصراف</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const close=()=>overlay.remove();
+    overlay.querySelector('#assignManagerCancel').addEventListener('click',close);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+    overlay.querySelector('#assignManagerConfirm').addEventListener('click',async()=>{
+      const uid=overlay.querySelector('#assignManagerSelect').value;
+      if(!ms.some(u=>u.uid===uid))return;
+      try{
+        v.managerUid=uid;
+        await window.MoshtaryarCloud.updateVendor(v);
+        localSaveAll();
+        close();
+        renderPanel();
+      }catch(e){
+        console.error(e);
+        alert('تخصیص آرایشگر انجام نشد. اتصال و قوانین Firestore را بررسی کن.');
+      }
+    });
   };
   window.deleteVendor=async function(id){
     if(currentRole!=='super_admin')return alert('فقط سوپرادمین می‌تواند فروشگاه را حذف کند.');
