@@ -333,6 +333,14 @@ vendors=vendors.map(v=>({...v,services:(v.services||[]).map(normalizeService)}))
 if(!Array.isArray(bookings))bookings=[];
 let cloudReady=false;
 let currentUser=null;
+function normalizeRole(value){
+  const r=String(value??'').trim().toLowerCase()
+    .replace(/[ي]/g,'ی').replace(/[ك]/g,'ک')
+    .replace(/[\s\-]+/g,'_');
+  if(['super_admin','superadmin','سوپر_مدیر','سوپر_ادمین','سوپرادمین','سوپرادمین','مدیر_کل','مدیرکل'].includes(r)) return 'super_admin';
+  if(['store_manager','storemanager','مدیر_فروشگاه','آرایشگر','ارایشگر'].includes(r)) return 'store_manager';
+  return 'customer';
+}
 let currentRole='customer';
 
 function localSaveAll(){
@@ -414,7 +422,7 @@ async function refreshRole(){
   if(!currentUser) return;
   try{
     const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
-    currentRole=profile?.role||'customer';
+    currentRole=normalizeRole(profile?.role);
   }catch(e){ currentRole='customer'; }
 }
 async function signOutUser(){
@@ -623,15 +631,16 @@ renderHome();renderVendors();populateSelects();renderPanel();
 
 <script>
 (function(){
-  const roleText=r=>r==='super_admin'?'سوپرادمین':r==='store_manager'?'مدیر فروشگاه':'مشتری';
+  const roleText=r=>normalizeRole(r)==='super_admin'?'سوپرادمین':normalizeRole(r)==='store_manager'?'آرایشگر':'مشتری';
 
   window.applyRoleUI=function(){
+    currentRole=normalizeRole(currentRole);
     const admin=currentRole==='super_admin', manager=currentRole==='store_manager';
     document.querySelectorAll('[data-page="panel"]').forEach(b=>b.style.display=(admin||manager)?'':'none');
     const cb=document.getElementById('clearBookingsBtn'); if(cb) cb.style.display=admin?'':'none';
     const au=document.getElementById('adminUsersSection'); if(au) au.hidden=!admin;
-    const pt=document.getElementById('panelTitle'); if(pt) pt.textContent=admin?'پنل سوپرادمین':'پنل مدیر فروشگاه';
-    const rn=document.getElementById('panelRoleNotice'); if(rn) rn.textContent=admin?'دسترسی کامل مدیریت پروژه آزمایشی.':manager?'فقط فروشگاه و نوبت‌های فروشگاه تخصیص‌یافته در دسترس است.':'حساب مشتری.';
+    const pt=document.getElementById('panelTitle'); if(pt) pt.textContent=admin?'پنل سوپرادمین':'پنل آرایشگر';
+    const rn=document.getElementById('panelRoleNotice'); if(rn) rn.textContent=admin?'دسترسی کامل مدیریت پروژه آزمایشی.':manager?'مدیریت فروشگاه و نوبت‌های مربوط به آرایشگاه خودت.':'حساب مشتری.';
     if(document.getElementById('accountInfo') && currentUser)
       document.getElementById('accountInfo').textContent=(currentUser.email||'حساب کاربری')+' — '+roleText(currentRole);
   };
@@ -659,7 +668,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
     if(!cloudReady||!currentUser)return;
     try{
       const p=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
-      currentRole=p?.role||'customer';
+      currentRole=normalizeRole(p?.role);
       const vs=await window.MoshtaryarCloud.getVendors(currentRole);
       vendors=vs.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
       bookings=await window.MoshtaryarCloud.getBookings(currentRole,vendors);
@@ -691,7 +700,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
 
   window.renderPanel=async function(){
     const box=document.getElementById('panelBookingsList');
-    if(currentRole==='customer'){box.innerHTML='<div class="empty">پنل مدیریت فقط برای مدیر فروشگاه و سوپرادمین است.</div>';return;}
+    if(currentRole==='customer'){box.innerHTML='<div class="empty">پنل مدیریت فقط برای آرایشگر و سوپرادمین است.</div>';return;}
     const admin=currentRole==='super_admin';
     box.innerHTML=bookings.length?bookings.slice().reverse().map(b=>{
       const s=b.status||'در انتظار تأیید', cls=s==='تأیید شده'?'status-approved':s==='رد شده'?'status-rejected':'status-pending';
@@ -718,7 +727,10 @@ renderHome();renderVendors();populateSelects();renderPanel();
 
   window.renderAdminUsers=async function(){
     const users=await window.MoshtaryarCloud.getAllUsers();
-    document.getElementById('adminUsersList').innerHTML=users.map(u=>`<article class="card"><h3>${esc(u.email||u.uid)}</h3><div class="muted">UID: ${esc(u.uid)}</div><label>نقش</label><select onchange="changeUserRole('${esc(u.uid)}',this.value)"><option value="customer" ${u.role==='customer'?'selected':''}>مشتری</option><option value="store_manager" ${u.role==='store_manager'?'selected':''}>مدیر فروشگاه</option><option value="super_admin" ${u.role==='super_admin'?'selected':''}>سوپرادمین</option></select></article>`).join('');
+    document.getElementById('adminUsersList').innerHTML=users.map(u=>{
+      const role=normalizeRole(u.role);
+      return `<article class="card"><h3>${esc(u.email||u.uid)}</h3><div class="muted">UID: ${esc(u.uid)}</div><label>نقش</label><select onchange="changeUserRole('${esc(u.uid)}',this.value)"><option value="customer" ${role==='customer'?'selected':''}>مشتری</option><option value="store_manager" ${role==='store_manager'?'selected':''}>آرایشگر</option><option value="super_admin" ${role==='super_admin'?'selected':''}>سوپرادمین</option></select></article>`;
+    }).join('');
   };
   window.changeUserRole=async function(uid,role){
     if(currentRole!=='super_admin'||uid===currentUser.uid)return alert('تغییر نقش خودت از این بخش مجاز نیست.');
@@ -726,8 +738,8 @@ renderHome();renderVendors();populateSelects();renderPanel();
   };
   window.assignManagerPrompt=async function(id){
     if(currentRole!=='super_admin')return;
-    const ms=(await window.MoshtaryarCloud.getAllUsers()).filter(u=>u.role==='store_manager');
-    if(!ms.length)return alert('ابتدا نقش یک کاربر را به «مدیر فروشگاه» تغییر بده.');
+    const ms=(await window.MoshtaryarCloud.getAllUsers()).filter(u=>normalizeRole(u.role)==='store_manager');
+    if(!ms.length)return alert('ابتدا نقش یک کاربر را به «آرایشگر» تغییر بده.');
     const answer=prompt(ms.map((u,i)=>`${i+1}. ${u.email||u.uid} — ${u.uid}`).join('\n')+'\n\nشماره مدیر:');
     const idx=Number(answer)-1;if(!ms[idx])return;
     const v=vendors.find(x=>x.id===id);if(!v)return;
@@ -772,7 +784,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
   window.addEventListener('moshtaryar-auth',async e=>{
     if(e.detail){
       currentUser=e.detail;cloudReady=!!window.MoshtaryarCloud.firebaseConfigured;
-      try{currentRole=(await window.MoshtaryarCloud.getUserProfile(currentUser.uid))?.role||'customer';}catch(_){currentRole='customer';}
+      try{currentRole=normalizeRole((await window.MoshtaryarCloud.getUserProfile(currentUser.uid))?.role);}catch(_){currentRole='customer';}
       setAppAuthenticated(currentUser);await loadCloudData();
     }else{cloudReady=false;setAppAuthenticated(null);}
   });
