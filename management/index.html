@@ -143,6 +143,10 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
  <div class="section-title"><h2 id="panelTitle">پنل مدیریت</h2><button id="clearBookingsBtn" class="btn danger" onclick="clearBookings()">پاک‌کردن نوبت‌ها</button></div>
  <div id="panelRoleNotice" class="notice"></div>
  <div id="panelBookingsList"></div>
+ <div id="adminManagerApplicationsSection" hidden>
+   <div class="section-title"><h2>درخواست‌های آرایشگری در انتظار تأیید</h2></div>
+   <div id="adminManagerApplications" class="grid"></div>
+ </div>
  <div class="section-title"><h2>مدیریت فروشگاه‌ها</h2></div><div id="manageVendors" class="grid"></div>
  <div id="adminUsersSection" hidden>
    <div class="section-title"><h2>کاربران و نقش‌ها</h2></div>
@@ -302,15 +306,15 @@ window.MoshtaryarCloud = {
   deleteVendor:id=>deleteDoc(doc(db,"vendors",id)),
   saveBooking, updateBooking,
   deleteBooking:id=>deleteDoc(doc(db,"bookings",id)),
-  updateUserRole:(uid,role)=>updateDoc(doc(db,"users",uid),{role,updatedAt:serverTimestamp()}),
   approveVendorManager,
   exists:async(c,id)=>(await getDoc(doc(db,c,id))).exists()
 };
 
 if (firebaseConfigured) {
-  onAuthStateChanged(auth, user => {
-    window.MoshtaryarCloud.currentUser = user;
-    window.dispatchEvent(new CustomEvent("moshtaryar-auth", { detail: user }));
+  onAuthStateChanged(auth, async user => {
+    window.MoshtaryarCloud.currentUser=user;
+    if (user) { try { await ensureProfile(user); } catch(e) { console.error(e); } }
+    window.dispatchEvent(new CustomEvent("moshtaryar-auth",{detail:user}));
   });
 }
 </script>
@@ -720,8 +724,15 @@ renderHome();renderVendors();populateSelects();renderPanel();
       return `<article class="card" style="margin-bottom:10px"><h3>${esc(b.name)} — ${esc(b.vendorName)}</h3><div class="info">📅 ${esc(b.date)}، ${esc(b.time)}</div><div class="info">☎️ ${esc(b.phone)}</div><div class="info">خدمت: ${esc(b.service||'ذکر نشده')}</div><div class="booking-status ${cls}">وضعیت: ${esc(s)}</div><div class="btn-row">${actions}${admin?`<button class="btn danger" onclick="deleteBooking('${esc(b.id)}')">حذف</button>`:''}</div></article>`;
     }).join(''):'<div class="empty">نوبتی پیدا نشد.</div>';
 
-    const mine=vendors.filter(v=>admin||v.ownerUid===currentUser.uid||v.managerUid===currentUser.uid);
-    document.getElementById('manageVendors').innerHTML=mine.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="muted">وضعیت: ${esc(v.status||'pending')} | مدیر: ${esc(v.managerUid||'تخصیص‌نیافته')}</div><div class="btn-row"><button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">${v.managerApplication?'تأیید آرایشگر و فروشگاه':'تأیید'}</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button><button class="btn light" onclick="assignManagerPrompt('${esc(v.id)}')">تخصیص آرایشگر</button><button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button>`:''}</div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
+    const appSection=document.getElementById('adminManagerApplicationsSection');
+    const appList=document.getElementById('adminManagerApplications');
+    if(appSection) appSection.hidden=!admin;
+    if(admin && appList){
+      const applications=vendors.filter(v=>v.managerApplication===true && (v.status||'pending')==='pending');
+      appList.innerHTML=applications.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="info">درخواست‌دهنده: ${esc(v.ownerUid||'شناسه ثبت نشده')}</div><div class="info">☎️ ${esc(v.phone||'شماره ثبت نشده')}</div><div class="info">📍 ${esc(v.address||'آدرس ثبت نشده')}</div><div class="muted">وضعیت: در انتظار تأیید سوپرادمین</div><div class="btn-row"><button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">تأیید آرایشگر</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد درخواست</button></div></article>`).join('')||'<div class="empty">درخواست آرایشگریِ در انتظار تأیید وجود ندارد.</div>';
+    }
+    const mine=vendors.filter(v=>(admin||v.ownerUid===currentUser.uid||v.managerUid===currentUser.uid) && !(admin && v.managerApplication===true && (v.status||'pending')==='pending'));
+    document.getElementById('manageVendors').innerHTML=mine.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="muted">وضعیت: ${esc(v.status||'pending')} | مدیر: ${esc(v.managerUid||'تخصیص‌نیافته')}</div><div class="btn-row"><button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">تأیید فروشگاه</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button><button class="btn light" onclick="assignManagerPrompt('${esc(v.id)}')">تخصیص آرایشگر</button><button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button>`:''}</div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
     if(admin) await renderAdminUsers();
   };
 
@@ -754,12 +765,12 @@ renderHome();renderVendors();populateSelects();renderPanel();
     const users=await window.MoshtaryarCloud.getAllUsers();
     document.getElementById('adminUsersList').innerHTML=users.map(u=>{
       const role=normalizeRole(u.role);
-      return `<article class="card"><h3>${esc(u.email||u.uid)}</h3><div class="muted">UID: ${esc(u.uid)}</div><label>نقش</label><select onchange="changeUserRole('${esc(u.uid)}',this.value)"><option value="customer" ${role==='customer'?'selected':''}>مشتری</option><option value="store_manager" ${role==='store_manager'?'selected':''}>آرایشگر</option><option value="super_admin" ${role==='super_admin'?'selected':''}>سوپرادمین</option></select></article>`;
+      const roleLabel=role==='super_admin'?'سوپرادمین':role==='store_manager'?'آرایشگر':'مشتری';
+      return `<article class="card"><h3>${esc(u.email||u.uid)}</h3><div class="muted">UID: ${esc(u.uid)}</div><div class="info">نقش فعلی: <strong>${roleLabel}</strong></div></article>`;
     }).join('');
   };
-  window.changeUserRole=async function(uid,role){
-    if(currentRole!=='super_admin'||uid===currentUser.uid)return alert('تغییر نقش خودت از این بخش مجاز نیست.');
-    await window.MoshtaryarCloud.updateUserRole(uid,role);await renderAdminUsers();
+  window.changeUserRole=async function(){
+    return alert('تغییر مستقیم نقش غیرفعال است؛ نقش آرایشگر فقط پس از تأیید درخواست توسط سوپرادمین فعال می‌شود.');
   };
   window.assignManagerPrompt=async function(id){
     if(currentRole!=='super_admin')return;
