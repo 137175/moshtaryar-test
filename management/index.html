@@ -834,12 +834,42 @@ renderHome();renderVendors();populateSelects();renderPanel();
     if(user) applyRoleUI();
   };
 
+  // Use one serialized auth handler. Never silently downgrade a profile-read
+  // failure to customer, and ignore stale responses when accounts are switched.
+  let authEventVersion=0;
   window.addEventListener('moshtaryar-auth',async e=>{
-    if(e.detail){
-      currentUser=e.detail;cloudReady=!!window.MoshtaryarCloud.firebaseConfigured;
-      try{currentRole=normalizeRole((await window.MoshtaryarCloud.getUserProfile(currentUser.uid))?.role);}catch(_){currentRole='customer';}
-      setAppAuthenticated(currentUser);await loadCloudData();
-    }else{cloudReady=false;setAppAuthenticated(null);}
+    const version=++authEventVersion;
+    const user=e.detail;
+    if(!user){
+      cloudReady=false;currentUser=null;currentRole='customer';
+      setAppAuthenticated(null);
+      return;
+    }
+    currentUser=user;
+    cloudReady=!!window.MoshtaryarCloud?.firebaseConfigured;
+    const msg=document.getElementById('authMsg');
+    if(msg)msg.textContent='در حال بررسی نقش حساب...';
+    try{
+      const profile=await window.MoshtaryarCloud.getUserProfile(user.uid);
+      if(version!==authEventVersion || window.MoshtaryarCloud.currentUser?.uid!==user.uid)return;
+      if(!profile || !profile.role){
+        if(msg)msg.textContent='برای این حساب سند نقش در Firestore پیدا نشد. شناسه حساب را بررسی کنید.';
+        return;
+      }
+      const role=normalizeRole(profile.role);
+      if(role!=='super_admin' && role!=='store_manager'){
+        if(msg)msg.textContent='این حساب نقش مدیریتی ندارد؛ نقش ثبت‌شده: '+String(profile.role);
+        return;
+      }
+      currentRole=role;
+      setAppAuthenticated(user);
+      await loadCloudData();
+      if(version!==authEventVersion)return;
+    }catch(err){
+      console.error('Moshtaryar role/profile read failed:',err);
+      if(version!==authEventVersion)return;
+      if(msg)msg.textContent='نقش حساب از Firestore خوانده نشد؛ حساب به‌اشتباه مشتری در نظر گرفته نشده است. خطا: '+(err.code||err.message||'نامشخص');
+    }
   });
 
   // Patch booking creation so every cloud booking belongs to the authenticated customer.
@@ -867,17 +897,6 @@ renderHome();renderVendors();populateSelects();renderPanel();
 (function(){
  const authMsg=document.getElementById('authMsg');
  const deny=async()=>{if(authMsg)authMsg.textContent='این حساب دسترسی مدیریتی ندارد. از نسخه مشتری استفاده کن.';try{await window.MoshtaryarCloud.signOut();}catch(e){console.error(e);}};
- window.addEventListener('moshtaryar-auth',async function(ev){
-   if(!ev.detail)return;
-   try{
-     const p=await window.MoshtaryarCloud.getUserProfile(ev.detail.uid);
-     const r=normalizeRole(p?.role);
-     if(r!=='super_admin'&&r!=='store_manager'){await deny();return;}
-     currentRole=r;
-     document.querySelectorAll('[data-page="vendors"],[data-page="new-vendor"],[data-page="booking"],[data-page="chat"]').forEach(x=>x.remove());
-     const clear=document.getElementById('clearBookingsBtn');if(clear)clear.style.display=r==='super_admin'?'':'none';
-   }catch(e){console.error(e);}
- });
  // A management-only account cannot be created from this page.
  const signup=document.getElementById('authSignup');if(signup)signup.remove();
 })();
