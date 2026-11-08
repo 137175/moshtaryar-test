@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#4f46e5">
-<title>مشتری‌یار | دستیار خدمات و نوبت‌دهی</title>
+<title>مشتریار | دستیار خدمات و نوبت‌دهی</title>
 <style>
 :root{--primary:#4f46e5;--primary2:#4338ca;--bg:#f5f7fb;--ink:#172033;--muted:#64748b;--line:#e2e8f0;--white:#fff;--green:#15803d;--red:#b91c1c}
 *{box-sizing:border-box}body{margin:0;font-family:Tahoma,"Vazirmatn",Arial,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:82px;line-height:1.7}
@@ -48,8 +48,8 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 <body>
 <header>
  <div class="head-inner">
-  <div class="brand"><div class="logo">🤝</div><div><h1>مشتری‌یار</h1><p>دستیار خدمات و نوبت‌دهی</p></div></div>
-  <span class="badge">نسخه آزمایشی جداگانه مشتری‌یار</span>
+  <div class="brand"><div class="logo">🤝</div><div><h1>مشتریار</h1><p>دستیار خدمات و نوبت‌دهی</p></div></div>
+  <span class="badge">نسخه آزمایشی جداگانه مشتریار</span>
   <nav class="desktop-nav" aria-label="منوی اصلی">
    <button data-page="home" onclick="showPage('home')">خانه</button>
    <button data-page="vendors" onclick="showPage('vendors')">فروشگاه‌ها</button>
@@ -70,7 +70,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 <main>
 <section id="page-auth" class="page active">
   <div class="hero">
-    <h2>ورود به مشتری‌یار</h2>
+    <h2>ورود به مشتریار</h2>
     <p>این نسخه برای پروژه آزمایشی <b>moshtariar-test-2026</b> آماده شده است. نقش کاربر از Firestore خوانده می‌شود و دسترسی‌ها بر اساس نقش محدود می‌شوند.</p>
   </div>
   <form id="authForm" class="form-card">
@@ -90,10 +90,10 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
   </div>
 </section>
 <section id="page-home" class="page">
- <div class="hero"><h2>خدمات موردنیازت را ساده‌تر پیدا کن ✨</h2><p>فروشگاه‌ها و خدمات را ببین، نوبت ثبت کن یا از دستیار مشتری‌یار دربارهٔ قیمت، ساعت کاری و آدرس سؤال بپرس.</p><div class="btn-row"><button class="btn" onclick="showPage('vendors')">دیدن فروشگاه‌ها</button><button class="btn secondary" onclick="showPage('chat')">گفت‌وگو با دستیار</button><button class="btn light" onclick="showPage('new-vendor')">ثبت فروشنده +</button></div></div>
+ <div class="hero"><h2>خدمات موردنیازت را ساده‌تر پیدا کن ✨</h2><p>فروشگاه‌ها و خدمات را ببین، نوبت ثبت کن یا از دستیار مشتریار دربارهٔ قیمت، ساعت کاری و آدرس سؤال بپرس.</p><div class="btn-row"><button class="btn" onclick="showPage('vendors')">دیدن فروشگاه‌ها</button><button class="btn secondary" onclick="showPage('chat')">گفت‌وگو با دستیار</button><button class="btn light" onclick="showPage('new-vendor')">ثبت فروشنده +</button></div></div>
  <div class="stats"><div class="stat"><strong id="statVendors">0</strong><span>فروشگاه</span></div><div class="stat"><strong id="statBookings">0</strong><span>رزرو ثبت‌شده</span></div><div class="stat"><strong>۲۴/۷</strong><span>دستیار آزمایشی</span></div></div>
  <div class="section-title"><h2>آرایشگاه‌های نزدیک شما</h2><button class="btn secondary" onclick="showPage('vendors')">همه فروشگاه‌ها</button></div><div class="nearby-tools"><button class="btn" type="button" onclick="findNearby()">📍 نمایش نزدیک‌ترین آرایشگاه‌ها</button><button class="btn light" type="button" onclick="clearNearby()">نمایش همه</button></div><div id="nearbyMsg" class="notice">برای دیدن آرایشگاه‌های نزدیک، دکمهٔ موقعیت را بزنید. اجازهٔ مکان فقط با درخواست شما گرفته می‌شود.</div><div id="homeVendors" class="grid"></div>
- <div class="notice">نسخه آزمایشی: پس از تکمیل تنظیمات Firebase، اطلاعات حساب وارد‌شده از پایگاه داده مشترک خوانده می‌شود. اطلاعات محلی قبلی بدون اجازه حذف نمی‌شوند.</div>
+ <div class="notice">نسخه آزمایشی: پس از تکمیل تنظیمات Firebase، اطلاعات حساب واردشده از پایگاه داده مشترک خوانده می‌شود. اطلاعات محلی قبلی بدون اجازه حذف نمی‌شوند.</div>
 </section>
 <section id="page-vendors" class="page">
  <div class="section-title"><h2>فروشگاه‌ها و خدمات</h2><button class="btn" onclick="showPage('new-vendor')">ثبت فروشنده +</button></div>
@@ -133,4 +133,161 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
  </form>
 </section>
 <section id="page-chat" class="page">
- <div class="section-title"><h2>دستیار پاسخ‌گوی مشتری‌یار 🤖</h2></div
+ <div class="section-title"><h2>دستیار پاسخ‌گوی مشتریار 🤖</h2></div>
+ <div class="chat-shell">
+  <div class="chat-head">دستیار مشتریار <div class="chat-sub">پاسخ‌گویی بر اساس اطلاعات ثبت‌شدهٔ فروشگاه‌ها؛ بدون اتصال به مدل هوش مصنوعی آنلاین</div></div>
+  <div class="chat-select"><label for="chatVendor" style="margin-top:0">دربارهٔ کدام فروشگاه سؤال داری؟</label><select id="chatVendor" onchange="addBotMessage('اطلاعات فروشگاه انتخاب‌شده عوض شد. حالا می‌توانی دربارهٔ قیمت، خدمات، ساعت کاری یا آدرس سؤال کنی.')"></select></div>
+  <div id="chatBox" class="chat-box" aria-live="polite"><div class="bubble bot">سلام! 👋 من دستیار مشتریار هستم. می‌توانم بر اساس اطلاعات فروشگاه به پرسش‌هایی مثل «آدرس کجاست؟»، «چه خدماتی دارید؟»، «قیمت چقدر است؟» و «چه ساعتی باز هستید؟» پاسخ بدهم.</div></div>
+  <form id="chatForm" class="chat-form"><input id="chatInput" required autocomplete="off" placeholder="سؤالت را بنویس..."><button class="btn" type="submit">ارسال</button></form>
+ </div>
+ <div class="notice">این دستیار از پاسخ‌های قاعده‌محور استفاده می‌کند؛ ممکن است سؤال‌های پیچیده را نفهمد. اگر اطلاعاتی در پروندهٔ فروشگاه ثبت نشده باشد، آن را حدس نمی‌زند.</div>
+ <div class="btn-row"><button class="btn secondary" onclick="quickAsk('قیمت خدمات چقدر است؟')">قیمت‌ها</button><button class="btn secondary" onclick="quickAsk('آدرس کجاست؟')">آدرس</button><button class="btn secondary" onclick="quickAsk('ساعات کاری چیست؟')">ساعات کاری</button><button class="btn secondary" onclick="quickAsk('چه خدماتی دارید؟')">خدمات</button></div>
+</section>
+<section id="page-panel" class="page">
+ <div class="section-title"><h2 id="panelTitle">پنل مدیریت</h2><button id="clearBookingsBtn" class="btn danger" onclick="clearBookings()">پاک‌کردن نوبت‌ها</button></div>
+ <div id="panelRoleNotice" class="notice"></div>
+ <div id="panelBookingsList"></div>
+ <div class="section-title"><h2>مدیریت فروشگاه‌ها</h2></div><div id="manageVendors" class="grid"></div>
+ <div id="adminUsersSection" hidden>
+   <div class="section-title"><h2>کاربران و نقش‌ها</h2></div>
+   <div id="adminUsersList" class="grid"></div>
+ </div>
+ <div class="notice">این نسخه فقط برای پروژه آزمایشی است. Security Rules هنوز باید جداگانه بررسی و سپس منتشر شوند.</div>
+</section>
+</main>
+<footer>مشتریار — نسخه آزمایشی جداگانه | اطلاعات سایت اصلی دست‌نخورده است<br>استفاده عمومی فقط پس از بررسی و انتشار قوانین امنیتی Firestore مجاز است.</footer>
+<nav class="mobile" aria-label="منوی پایین">
+ <button data-page="home" onclick="showPage('home')" class="active"><span class="ico">🏠</span><span>خانه</span></button>
+ <button data-page="vendors" onclick="showPage('vendors')"><span class="ico">🏪</span><span>فروشگاه‌ها</span></button>
+ <button data-page="new-vendor" onclick="showPage('new-vendor')"><span class="ico">➕</span><span>ثبت فروشنده</span></button>
+ <button data-page="booking" onclick="showPage('booking')"><span class="ico">📅</span><span>رزرو</span></button>
+ <button data-page="chat" onclick="showPage('chat')"><span class="ico">🤖</span><span>دستیار</span></button>
+ <button data-page="panel" onclick="showPage('panel')"><span class="ico">📋</span><span>پنل</span></button>
+</nav>
+
+<div id="confirmDeleteModal" class="confirm-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="confirmDeleteTitle">
+  <div class="confirm-box">
+    <h2 id="confirmDeleteTitle">حذف نوبت</h2>
+    <p id="confirmDeleteText">آیا مطمئنی می‌خواهی این نوبت را حذف کنی؟</p>
+    <div class="btn-row">
+      <button id="confirmDeleteYes" class="btn danger" type="button">بله، حذف کن</button>
+      <button id="confirmDeleteNo" class="btn secondary" type="button">نه، برگشت</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signOut
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+  collection, getDocs, query, where, serverTimestamp, writeBatch
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDXAC5FYtJpFut62Q8fuk9aC9m2Sjt17h0",
+  authDomain: "moshtariar-test-2026.firebaseapp.com",
+  databaseURL: "https://moshtariar-test-2026-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "moshtariar-test-2026",
+  storageBucket: "moshtariar-test-2026.firebasestorage.app",
+  messagingSenderId: "154285472967",
+  appId: "1:154285472967:web:1851b147da3265411552e2",
+  measurementId: "G-XGP5J7PFXH"
+};
+
+const firebaseConfigured = !Object.values(firebaseConfig).some(v => String(v).startsWith("PASTE_"));
+let app = null, auth = null, db = null;
+
+if (firebaseConfigured) {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+}
+
+const clean = obj => Object.fromEntries(Object.entries(obj || {}).filter(([,v]) => v !== undefined));
+
+async function ensureProfile(user) {
+  const ref = doc(db, "users", user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      uid:user.uid, email:user.email || "", role:"customer", storeId:null,
+      createdAt:serverTimestamp(), updatedAt:serverTimestamp()
+    });
+  } else {
+    await updateDoc(ref, {email:user.email || "", updatedAt:serverTimestamp()});
+  }
+  return (await getDoc(ref)).data();
+}
+async function profile(uid) {
+  const s = await getDoc(doc(db,"users",uid));
+  return s.exists() ? s.data() : null;
+}
+async function saveVendor(v) {
+  await setDoc(doc(db,"vendors",v.id), clean({
+    ...v, ownerUid:v.ownerUid || auth.currentUser.uid,
+    managerUid:v.managerUid ?? null, status:v.status || "pending",
+    createdAt:v.createdAt || serverTimestamp(), updatedAt:serverTimestamp()
+  }), {merge:true});
+}
+async function updateVendor(v) {
+  await setDoc(doc(db,"vendors",v.id), clean({...v,updatedAt:serverTimestamp()}), {merge:true});
+}
+async function saveBooking(b) {
+  await setDoc(doc(db,"bookings",b.id), clean({
+    ...b, customerUid:b.customerUid || auth.currentUser.uid,
+    status:b.status || "در انتظار تأیید",
+    createdAt:b.createdAt || serverTimestamp(), updatedAt:serverTimestamp()
+  }), {merge:true});
+}
+async function updateBooking(b) {
+  await setDoc(doc(db,"bookings",b.id), clean({...b,updatedAt:serverTimestamp()}), {merge:true});
+}
+async function getVendors(role) {
+  let s;
+  if (role === "super_admin") s = await getDocs(collection(db,"vendors"));
+  else if (role === "store_manager") {
+    const [managed, owned] = await Promise.all([
+      getDocs(query(collection(db,"vendors"),where("managerUid","==",auth.currentUser.uid))),
+      getDocs(query(collection(db,"vendors"),where("ownerUid","==",auth.currentUser.uid)))
+    ]);
+    const byId = new Map();
+    [...managed.docs, ...owned.docs].forEach(d=>byId.set(d.id,{id:d.id,...d.data()}));
+    return [...byId.values()];
+  } else s = await getDocs(query(collection(db,"vendors"),where("status","==","approved")));
+  return s.docs.map(d=>({id:d.id,...d.data()}));
+}
+async function getBookings(role, vs) {
+  if (role === "super_admin") {
+    const s=await getDocs(collection(db,"bookings")); return s.docs.map(d=>({id:d.id,...d.data()}));
+  }
+  if (role === "customer") {
+    const s=await getDocs(query(collection(db,"bookings"),where("customerUid","==",auth.currentUser.uid)));
+    return s.docs.map(d=>({id:d.id,...d.data()}));
+  }
+  const out=[];
+  for (const v of vs) {
+    const s=await getDocs(query(collection(db,"bookings"),where("vendorId","==",v.id)));
+    s.forEach(d=>out.push({id:d.id,...d.data()}));
+  }
+  return out;
+}
+async function approveVendorManager(vendor) {
+  if (!vendor?.id || !vendor?.ownerUid) throw new Error("درخواست آرایشگری اطلاعات مالک ندارد.");
+  const batch = writeBatch(db);
+  batch.set(doc(db,"users",vendor.ownerUid), {
+    uid:vendor.ownerUid, role:"store_manager",
+    updatedAt:serverTimestamp()
+  }, {merge:true});
+  batch.set(doc(db,"vendors",vendor.id), {
+    status:"approved", managerUid:vendor.ownerUid,
+    managerApplication:false, managerApprovedAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  }, {merge:true});
+  await batch.commit();
+}
+async function allUsers() {
+  const s=await getDocs(collection(db,"users")); return
