@@ -378,10 +378,9 @@ async function saveAll(){
 async function loadCloudData(){
   if(!cloudReady) return;
   try{
-    const [cv,cb] = await Promise.all([
-      window.MoshtaryarCloud.getVendors(),
-      window.MoshtaryarCloud.getBookings()
-    ]);
+    // Load vendors first: booking queries for managers depend on their vendor IDs.
+    const cv = await window.MoshtaryarCloud.getVendors(currentRole);
+    const cb = await window.MoshtaryarCloud.getBookings(currentRole, cv);
     if(cv.length) vendors=cv.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
     if(cb.length) bookings=cb;
     localSaveAll();
