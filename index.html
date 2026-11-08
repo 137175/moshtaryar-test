@@ -49,29 +49,25 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 <header>
  <div class="head-inner">
   <div class="brand"><div class="logo">🤝</div><div><h1>مشتریار</h1><p>دستیار خدمات و نوبت‌دهی</p></div></div>
-  <span class="badge">نسخه آزمایشی جداگانه مشتریار</span>
-  <nav class="desktop-nav" aria-label="منوی اصلی">
-   <button data-page="home" onclick="showPage('home')">خانه</button>
-   <button data-page="vendors" onclick="showPage('vendors')">فروشگاه‌ها</button>
-   <button data-page="new-vendor" onclick="showPage('new-vendor')">ثبت فروشنده +</button>
-   <button data-page="booking" onclick="showPage('booking')">رزرو</button>
-   <button data-page="chat" onclick="showPage('chat')">دستیار</button>
-   <button data-page="panel" onclick="showPage('panel')">پنل مدیریت</button>
+  <span class="badge">نسخه مدیریت مشتریار</span>
+  <nav class="desktop-nav" aria-label="منوی مدیریت">
+   <button data-page="home" onclick="showPage('home')">داشبورد</button>
+   <button data-page="panel" onclick="showPage('panel')">مدیریت نوبت‌ها و فروشگاه‌ها</button>
   </nav>
  </div>
 </header>
 <div id="accountBar" class="notice" style="display:none;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
   <div><b>حساب:</b> <span id="accountInfo"></span></div>
   <div class="btn-row" style="margin-top:0">
-    <button class="btn secondary" type="button" onclick="migrateLocalDataToCloud()">☁️ انتقال امن اطلاعات محلی</button>
+    
     <button class="btn light" type="button" onclick="signOutUser()">خروج</button>
   </div>
 </div>
 <main>
 <section id="page-auth" class="page active">
   <div class="hero">
-    <h2>ورود به مشتریار</h2>
-    <p>این نسخه برای پروژه آزمایشی <b>moshtariar-test-2026</b> آماده شده است. نقش کاربر از Firestore خوانده می‌شود و دسترسی‌ها بر اساس نقش محدود می‌شوند.</p>
+    <h2>ورود مدیران مشتریار</h2>
+    <p>این نسخه برای پروژه آزمایشی <b>moshtariar-test-2026</b> آماده شده است. فقط حساب‌های آرایشگر و سوپرادمین اجازه ورود به این بخش را دارند.</p>
   </div>
   <form id="authForm" class="form-card" onsubmit="event.preventDefault(); if(window.moshtaryarLogin){window.moshtaryarLogin(event)}else{document.getElementById('authMsg').textContent='کد ورود هنوز بارگذاری نشده است. اینترنت را بررسی و صفحه را تازه‌سازی کن.'} return false;">
     <label for="authEmail">ایمیل *</label>
@@ -80,7 +76,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
     <input id="authPassword" type="password" required minlength="6" autocomplete="current-password" placeholder="حداقل ۶ کاراکتر">
     <div class="btn-row">
       <button class="btn" type="submit">ورود</button>
-      <button class="btn secondary" type="button" id="authSignup">ثبت‌نام</button>
+      <button class="btn secondary" type="button" id="authSignup" style="display:none">ثبت‌نام</button>
     </div>
     <p id="authMsg" class="muted" role="status"></p>
   </form>
@@ -90,17 +86,17 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
   </div>
 </section>
 <section id="page-home" class="page">
- <div class="hero"><h2>خدمات موردنیازت را ساده‌تر پیدا کن ✨</h2><p>فروشگاه‌ها و خدمات را ببین، نوبت ثبت کن یا از دستیار مشتریار دربارهٔ قیمت، ساعت کاری و آدرس سؤال بپرس.</p><div class="btn-row"><button class="btn" onclick="showPage('vendors')">دیدن فروشگاه‌ها</button><button class="btn secondary" onclick="showPage('chat')">گفت‌وگو با دستیار</button><button class="btn light" onclick="showPage('new-vendor')">ثبت فروشنده +</button></div></div>
+ <div class="hero"><h2>داشبورد مدیریت مشتریار</h2><p>وضعیت فروشگاه‌ها و نوبت‌های مربوط به حساب مدیریتی خود را بررسی کن.</p><div class="btn-row"><button class="btn" onclick="showPage('panel')">رفتن به مدیریت</button></div></div>
  <div class="stats"><div class="stat"><strong id="statVendors">0</strong><span>فروشگاه</span></div><div class="stat"><strong id="statBookings">0</strong><span>رزرو ثبت‌شده</span></div><div class="stat"><strong>۲۴/۷</strong><span>دستیار آزمایشی</span></div></div>
  <div class="section-title"><h2>آرایشگاه‌های نزدیک شما</h2><button class="btn secondary" onclick="showPage('vendors')">همه فروشگاه‌ها</button></div><div class="nearby-tools"><button class="btn" type="button" onclick="findNearby()">📍 نمایش نزدیک‌ترین آرایشگاه‌ها</button><button class="btn light" type="button" onclick="clearNearby()">نمایش همه</button></div><div id="nearbyMsg" class="notice">برای دیدن آرایشگاه‌های نزدیک، دکمهٔ موقعیت را بزنید. اجازهٔ مکان فقط با درخواست شما گرفته می‌شود.</div><div id="homeVendors" class="grid"></div>
  <div class="notice">نسخه آزمایشی: پس از تکمیل تنظیمات Firebase، اطلاعات حساب واردشده از پایگاه داده مشترک خوانده می‌شود. اطلاعات محلی قبلی بدون اجازه حذف نمی‌شوند.</div>
 </section>
-<section id="page-vendors" class="page">
+<section id="page-vendors" style="display:none" class="page">
  <div class="section-title"><h2>فروشگاه‌ها و خدمات</h2><button class="btn" onclick="showPage('new-vendor')">ثبت فروشنده +</button></div>
  <div class="nearby-tools"><button class="btn" type="button" onclick="findNearby()">📍 مرتب‌سازی بر اساس نزدیکی</button><button class="btn light" type="button" onclick="clearNearby()">نمایش همه</button></div><div id="vendorNearbyMsg" class="notice" hidden></div><input id="vendorSearch" class="search" type="search" placeholder="جست‌وجوی نام، آدرس یا خدمت..." oninput="renderVendors()">
  <div id="vendorList" class="grid"></div>
 </section>
-<section id="page-new-vendor" class="page">
+<section id="page-new-vendor" style="display:none" class="page">
  <div class="section-title"><h2 id="vendorFormTitle">ثبت فروشندهٔ جدید</h2></div>
  <form id="vendorForm" class="form-card">
   <div class="notice">برای درخواست همکاری به‌عنوان آرایشگر، با حساب خود وارد شو و اطلاعات آرایشگاهت را ثبت کن. پس از تأیید سوپرادمین، نقش آرایشگر و دسترسی به همین فروشگاه خودکار فعال می‌شود. برای خدمات چندگانه، هر خدمت را در یک خط بنویس؛ قالب: نام خدمت - قیمت.</div>
@@ -117,7 +113,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
   <p id="vendorFormMsg" class="muted" role="status"></p>
  </form>
 </section>
-<section id="page-booking" class="page">
+<section id="page-booking" style="display:none" class="page">
  <div class="section-title"><h2>رزرو نوبت</h2></div>
  <form id="bookingForm" class="form-card">
   <label for="bookVendor">انتخاب فروشگاه *</label><select id="bookVendor" required></select>
@@ -132,7 +128,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
   <small class="muted">با زدن این دکمه، برگهٔ اشتراک‌گذاری گوشی باز می‌شود. روبیکا را انتخاب کن؛ پیام فقط پس از تأیید خودت ارسال می‌شود.</small>
  </form>
 </section>
-<section id="page-chat" class="page">
+<section id="page-chat" style="display:none" class="page">
  <div class="section-title"><h2>دستیار پاسخ‌گوی مشتریار 🤖</h2></div>
  <div class="chat-shell">
   <div class="chat-head">دستیار مشتریار <div class="chat-sub">پاسخ‌گویی بر اساس اطلاعات ثبت‌شدهٔ فروشگاه‌ها؛ بدون اتصال به مدل هوش مصنوعی آنلاین</div></div>
@@ -156,13 +152,9 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 </section>
 </main>
 <footer>مشتریار — نسخه آزمایشی جداگانه | اطلاعات سایت اصلی دست‌نخورده است<br>استفاده عمومی فقط پس از بررسی و انتشار قوانین امنیتی Firestore مجاز است.</footer>
-<nav class="mobile" aria-label="منوی پایین">
- <button data-page="home" onclick="showPage('home')" class="active"><span class="ico">🏠</span><span>خانه</span></button>
- <button data-page="vendors" onclick="showPage('vendors')"><span class="ico">🏪</span><span>فروشگاه‌ها</span></button>
- <button data-page="new-vendor" onclick="showPage('new-vendor')"><span class="ico">➕</span><span>ثبت فروشنده</span></button>
- <button data-page="booking" onclick="showPage('booking')"><span class="ico">📅</span><span>رزرو</span></button>
- <button data-page="chat" onclick="showPage('chat')"><span class="ico">🤖</span><span>دستیار</span></button>
- <button data-page="panel" onclick="showPage('panel')"><span class="ico">📋</span><span>پنل</span></button>
+<nav class="mobile" aria-label="منوی مدیریت">
+ <button data-page="home" onclick="showPage('home')"><span class="ico">📊</span><span>داشبورد</span></button>
+ <button data-page="panel" onclick="showPage('panel')"><span class="ico">📋</span><span>مدیریت</span></button>
 </nav>
 
 <div id="confirmDeleteModal" class="confirm-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="confirmDeleteTitle">
@@ -868,6 +860,27 @@ renderHome();renderVendors();populateSelects();renderPanel();
     const n=document.getElementById('firebaseSetupNotice');
     if(n)n.innerHTML='تنظیمات Firebase در این نسخه قرار دارد. پیش از استفاده واقعی، قوانین امنیتی Firestore باید بررسی و آزمایش شوند.';
   }
+})();
+</script>
+
+
+<script>
+(function(){
+ const authMsg=document.getElementById('authMsg');
+ const deny=async()=>{if(authMsg)authMsg.textContent='این حساب دسترسی مدیریتی ندارد. از نسخه مشتری استفاده کن.';try{await window.MoshtaryarCloud.signOut();}catch(e){console.error(e);}};
+ window.addEventListener('moshtaryar-auth',async function(ev){
+   if(!ev.detail)return;
+   try{
+     const p=await window.MoshtaryarCloud.getUserProfile(ev.detail.uid);
+     const r=normalizeRole(p?.role);
+     if(r!=='super_admin'&&r!=='store_manager'){await deny();return;}
+     currentRole=r;
+     document.querySelectorAll('[data-page="vendors"],[data-page="new-vendor"],[data-page="booking"],[data-page="chat"]').forEach(x=>x.remove());
+     const clear=document.getElementById('clearBookingsBtn');if(clear)clear.style.display=r==='super_admin'?'':'none';
+   }catch(e){console.error(e);}
+ });
+ // A management-only account cannot be created from this page.
+ const signup=document.getElementById('authSignup');if(signup)signup.remove();
 })();
 </script>
 
