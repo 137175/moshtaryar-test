@@ -308,10 +308,9 @@ window.MoshtaryarCloud = {
 };
 
 if (firebaseConfigured) {
-  onAuthStateChanged(auth, async user => {
-    window.MoshtaryarCloud.currentUser=user;
-    if (user) { try { await ensureProfile(user); } catch(e) { console.error(e); } }
-    window.dispatchEvent(new CustomEvent("moshtaryar-auth",{detail:user}));
+  onAuthStateChanged(auth, user => {
+    window.MoshtaryarCloud.currentUser = user;
+    window.dispatchEvent(new CustomEvent("moshtaryar-auth", { detail: user }));
   });
 }
 </script>
