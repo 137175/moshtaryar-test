@@ -561,7 +561,7 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
     if(!v){alert('فروشگاه برای ویرایش پیدا نشد.');return}
     Object.assign(v,data);
   }else{
-    v={id:'v-'+Date.now(),...data,ownerUid:currentUser?.uid||null,managerUid:currentRole==='store_manager'?(currentUser?.uid||null):null,status:'pending',managerApplication:currentRole==='customer'&&!!currentUser};
+    v={id:'v-'+Date.now(),...data,ownerUid:currentUser?.uid||null,managerUid:null,status:'pending',managerApplication:!!currentUser&&currentRole!=='super_admin'};
     vendors.push(v);
   }
   const savedId=v.id;
