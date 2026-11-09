@@ -85,6 +85,33 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
     <br>برای اتصال واقعی، بخش <b>firebaseConfig</b> در انتهای فایل باید با تنظیمات Web App پروژه آزمایشی تکمیل شود.
   </div>
 </section>
+<script>
+// Early login handler: available even if a later management script fails to initialize.
+window.moshtaryarLogin = async function(event) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  const msg = document.getElementById('authMsg');
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const cloud = window.MoshtaryarCloud;
+  if (!cloud) {
+    msg.textContent = 'ماژول اتصال Firebase بارگذاری نشده است. صفحه را تازه‌سازی کن؛ اگر تکرار شد، خطای بارگذاری ماژول را بررسی می‌کنیم.';
+    return false;
+  }
+  if (!cloud.firebaseConfigured || !cloud.auth) {
+    msg.textContent = 'اتصال Firebase آماده نیست. تنظیمات پروژه را بررسی می‌کنیم.';
+    return false;
+  }
+  msg.textContent = 'در حال ورود...';
+  try {
+    await cloud.signIn(email, password);
+    msg.textContent = 'ورود موفق بود؛ در حال دریافت اطلاعات حساب...';
+  } catch (error) {
+    console.error('Moshtaryar sign-in error:', error);
+    msg.textContent = 'ورود ناموفق بود: ' + (error.code || error.message || 'خطای نامشخص');
+  }
+  return false;
+};
+</script>
 <section id="page-home" class="page">
  <div class="hero"><h2>داشبورد مدیریت مشتریار</h2><p>وضعیت فروشگاه‌ها و نوبت‌های مربوط به حساب مدیریتی خود را بررسی کن.</p><div class="btn-row"><button class="btn" onclick="showPage('panel')">رفتن به مدیریت</button></div></div>
  <div class="stats"><div class="stat"><strong id="statVendors">0</strong><span>فروشگاه</span></div><div class="stat"><strong id="statBookings">0</strong><span>رزرو ثبت‌شده</span></div><div class="stat"><strong>۲۴/۷</strong><span>دستیار آزمایشی</span></div></div>
@@ -273,30 +300,4 @@ async function getBookings(role, vs) {
   return out;
 }
 async function approveVendorManager(vendor) {
-  if (!auth?.currentUser) throw new Error("برای تأیید باید وارد حساب شوید.");
-  const adminProfile = await profile(auth.currentUser.uid);
-  if (adminProfile?.role !== "super_admin") throw new Error("فقط سوپرادمین اجازه تأیید درخواست آرایشگری را دارد.");
-  if (!vendor?.id || !vendor?.ownerUid) throw new Error("درخواست آرایشگری اطلاعات مالک ندارد.");
-  const batch = writeBatch(db);
-  batch.set(doc(db,"users",vendor.ownerUid), {
-    uid:vendor.ownerUid, role:"store_manager",
-    updatedAt:serverTimestamp()
-  }, {merge:true});
-  batch.set(doc(db,"vendors",vendor.id), {
-    status:"approved", managerUid:vendor.ownerUid,
-    managerApplication:false, managerApprovedAt:serverTimestamp(),
-    updatedAt:serverTimestamp()
-  }, {merge:true});
-  await batch.commit();
-}
-async function allUsers() {
-  const s=await getDocs(collection(db,"users")); return s.docs.map(d=>({id:d.id,...d.data()}));
-}
-
-window.MoshtaryarCloud = {
-  firebaseConfigured,
-  currentUser:null,
-  auth,
-  app,
-  signIn:(e,p)=>signInWithEmailAndPassword(auth,e,p),
-  signUp:async(e,p)=>{const c=await createUserWithEmailAndPassword(auth,e,p);
+  if (!auth?.currentUser) throw new Error("برای تأیید باید وارد حساب ش
