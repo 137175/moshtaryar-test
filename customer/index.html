@@ -134,7 +134,6 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 </section>
 <section id="page-my-bookings" class="page">
  <div class="section-title"><h2>نوبت‌های من</h2><button class="btn secondary" onclick="refreshMyBookings()">به‌روزرسانی</button></div>
- <div class="notice">وضعیت نوبت‌هایی را می‌بینی که با همین حساب ثبت کرده‌ای.</div>
  <div id="myBookingsList"></div>
 </section>
 <section id="page-chat" class="page">
@@ -503,7 +502,7 @@ document.getElementById('authSignup').addEventListener('click',async()=>{
   }catch(err){ msg.textContent='ثبت‌نام ناموفق بود: '+(err.code||err.message); }
 });
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function showPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+name));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===name));if(name==='vendors')renderVendors();if(name==='booking')populateSelects();if(name==='chat')populateSelects();if(name==='panel')renderPanel();if(name==='my-bookings')renderMyBookings();if(name==='home')renderHome();window.scrollTo({top:0,behavior:'smooth'})}
+function showPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+name));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===name));if(name==='vendors')renderVendors();if(name==='booking')populateSelects();if(name==='chat')populateSelects();if(name==='panel')renderPanel();if(name==='my-bookings')refreshMyBookings();if(name==='home')renderHome();window.scrollTo({top:0,behavior:'smooth'})}
 let customerPosition=null;
 function distanceKm(a,b){const rad=x=>x*Math.PI/180;const dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);const q=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;return 6371*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q))}
 function distanceLabel(v){if(!customerPosition||v.lat==null||v.lng==null||!Number.isFinite(Number(v.lat))||!Number.isFinite(Number(v.lng)))return '';const d=distanceKm(customerPosition,{lat:Number(v.lat),lng:Number(v.lng)});return `<div class="distance">📍 حدود ${d<1?Math.round(d*1000)+' متر':d.toFixed(1)+' کیلومتر'} با شما فاصله</div>`}
@@ -881,15 +880,25 @@ renderHome();renderVendors();populateSelects();renderPanel();
 // Customer-only experience: list bookings owned by the signed-in customer.
 async function refreshMyBookings(){
   const box=document.getElementById('myBookingsList');
-  if(!currentUser){box.innerHTML='<div class="empty">برای دیدن نوبت‌ها ابتدا وارد حساب شو.</div>';return;}
-  box.innerHTML='<div class="notice">در حال دریافت نوبت‌ها...</div>';
+  if(!box)return;
+  if(!currentUser){
+    box.innerHTML='<div class="empty">برای دیدن نوبت‌ها ابتدا وارد حساب شو.</div>';
+    return;
+  }
+  box.innerHTML='<div class="empty">در حال دریافت نوبت‌ها...</div>';
   try{
-    if(window.MoshtaryarCloud?.firebaseConfigured){
-      bookings=await window.MoshtaryarCloud.getBookings('customer',vendors);
-      localSaveAll();
+    const cloud=window.MoshtaryarCloud;
+    if(!cloud?.firebaseConfigured || !cloud.currentUser){
+      throw new Error('اتصال حساب به Firebase آماده نیست.');
     }
+    // دریافت مستقیم نوبت‌های همین حساب؛ بدون نوشتن یا تغییر داده‌های ذخیره‌شده
+    const fresh=await cloud.getBookings('customer',vendors);
+    bookings=Array.isArray(fresh)?fresh:[];
     renderMyBookings();
-  }catch(e){console.error(e);box.innerHTML='<div class="empty">دریافت نوبت‌ها ناموفق بود. اتصال اینترنت را بررسی کن.</div>';}
+  }catch(e){
+    console.error('refreshMyBookings:',e);
+    box.innerHTML='<div class="empty">نوبت‌ها دریافت نشدند. دوباره «به‌روزرسانی» را بزن.</div>';
+  }
 }
 function renderMyBookings(){
   const box=document.getElementById('myBookingsList');if(!box)return;
