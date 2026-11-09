@@ -876,7 +876,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
 })();
 </script>
 
-
+<script>
 // Customer-only experience: list bookings owned by the signed-in customer.
 async function refreshMyBookings(){
   const box=document.getElementById('myBookingsList');
@@ -910,8 +910,6 @@ function renderMyBookings(){
   }).join(''):'<div class="empty">هنوز با این حساب نوبتی ثبت نکرده‌ای.</div>';
 }
 
-
-<script>
 (function(){
  const msg=()=>document.getElementById('authMsg');
  window.addEventListener('moshtaryar-auth',async function(ev){
