@@ -654,7 +654,16 @@ function answerQuestion(question){
  if(/^(ممنون|مرسی|سپاس|تشکر|دمت گرم)/.test(q))return 'خواهش می‌کنم 🌷 سؤال دیگری داری؟';
  const intents={price:['قیمت','هزینه','چنده','چقدر','تعرفه','مبلغ','پول','گرونه','ارزونه'],services:['خدمات','سرویس','چه کار','چه کاری','انجام میدین','انجام میدید','دارین','دارید','ارائه'],address:['آدرس','نشانی','کجا','مکان','لوکیشن','مسیر'],phone:['تلفن','تماس','شماره','زنگ','موبایل','ارتباط'],hours:['ساعت','باز','بسته','کاری','چه وقت','کی باز','کی میبندین','چه زمانی'],duration:['مدت','چقدر طول','چند دقیقه','زمان انجام','طول میکشه'],booking:['رزرو','نوبت','وقت گرفتن','وقت میخوام','وقت میخواهم'],faq:['پارکینگ','پرداخت','کارتخوان','شرایط','توضیح','بیمه','مدرک','تخفیف']};
  const found=Object.entries(intents).filter(([k,words])=>words.some(w=>q.includes(normalizeAssistantText(w)))).map(([k])=>k);
- const service=(v.services||[]).find(s=>{const name=normalizeAssistantText(s.name);return name.length>1&&(q.includes(name)||name.split(' ').filter(x=>x.length>2).some(x=>q.includes(x)))});
+ // Match the complete service name first. Never select a service merely because
+ // it shares one generic word (for example «رنگ» in «رنگ مو» and «رنگ ابرو»).
+ const service=(v.services||[]).map(s=>{
+  const name=normalizeAssistantText(s.name);
+  if(!name)return {s,score:0};
+  const phraseMatch=q.includes(name);
+  const tokens=name.split(' ').filter(x=>x.length>1);
+  const allTokens=tokens.length>1&&tokens.every(t=>(` ${q} `).includes(` ${t} `));
+  return {s,score:phraseMatch?1000+name.length:allTokens?100+name.length:0};
+ }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score)[0]?.s||null;
  if(service&&!found.some(x=>['price','duration','services'].includes(x)))found.push('price');
  if(!found.length){if(v.faq&&q.length>3)return `اطلاعات تکمیلی ثبت‌شده برای ${v.name}:\n${v.faq}\n\nاگر منظورت مورد دیگری است، دقیق‌تر بگو: قیمت، خدمات، آدرس، تماس یا ساعت کاری؟`;return `برای اینکه پاسخ اشتباه ندهم، منظورت کدام مورد است؟\n۱) قیمت یک خدمت\n۲) فهرست خدمات\n۳) مدت انجام خدمت\n۴) آدرس یا شماره تماس\n۵) ساعت کاری\n۶) رزرو نوبت`}
  const out=[];const list=v.services||[];
@@ -666,7 +675,11 @@ function answerQuestion(question){
  if(found.includes('hours'))out.push(`ساعات کاری ${v.name}: ${v.hours||'در اطلاعات فروشگاه ثبت نشده است.'}`);
  if(found.includes('booking'))out.push(`برای ثبت نوبت ${v.name}، بخش «رزرو» را باز کن و فروشگاه، خدمت، تاریخ و ساعت را انتخاب کن. وضعیت نوبت را بعداً در بخش نوبت‌های من می‌بینی.`);
  if(found.includes('faq'))out.push(v.faq?`اطلاعات تکمیلی ثبت‌شده: ${v.faq}`:'برای این موضوع اطلاعاتی در پروندهٔ فروشگاه ثبت نشده است.');
- if(found.includes('price'))out.push('قیمت‌ها فقط بر اساس اطلاعات ثبت‌شده نمایش داده شده‌اند؛ برای قیمت قطعی با فروشگاه هماهنگ کن.');
+ if(found.includes('price')){
+  const priceItems=service?[service]:list;
+  const hasMissingPrice=!priceItems.length||priceItems.some(s=>!String(s.price||'').trim()||/^(?:برای قیمت تماس بگیرید|استعلام|قیمت نامشخص|ثبت نشده)$/i.test(String(s.price||'').trim()));
+  if(hasMissingPrice)out.push('قیمت این خدمت در اطلاعات فروشگاه ثبت نشده است؛ برای اطلاع از قیمت با فروشگاه تماس بگیر.');
+ }
  return out.join('\n\n');
 }
 document.getElementById('chatForm').addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('chatInput'),q=input.value.trim();if(!q)return;addUserMessage(q);input.value='';setTimeout(()=>addBotMessage(answerQuestion(q)),180)});
