@@ -85,33 +85,6 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
     <br>برای اتصال واقعی، بخش <b>firebaseConfig</b> در انتهای فایل باید با تنظیمات Web App پروژه آزمایشی تکمیل شود.
   </div>
 </section>
-<script>
-// Early login handler: available even if a later management script fails to initialize.
-window.moshtaryarLogin = async function(event) {
-  if (event) { event.preventDefault(); event.stopPropagation(); }
-  const msg = document.getElementById('authMsg');
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
-  const cloud = window.MoshtaryarCloud;
-  if (!cloud) {
-    msg.textContent = 'ماژول اتصال Firebase بارگذاری نشده است. صفحه را تازه‌سازی کن؛ اگر تکرار شد، خطای بارگذاری ماژول را بررسی می‌کنیم.';
-    return false;
-  }
-  if (!cloud.firebaseConfigured || !cloud.auth) {
-    msg.textContent = 'اتصال Firebase آماده نیست. تنظیمات پروژه را بررسی می‌کنیم.';
-    return false;
-  }
-  msg.textContent = 'در حال ورود...';
-  try {
-    await cloud.signIn(email, password);
-    msg.textContent = 'ورود موفق بود؛ در حال دریافت اطلاعات حساب...';
-  } catch (error) {
-    console.error('Moshtaryar sign-in error:', error);
-    msg.textContent = 'ورود ناموفق بود: ' + (error.code || error.message || 'خطای نامشخص');
-  }
-  return false;
-};
-</script>
 <section id="page-home" class="page">
  <div class="hero"><h2>داشبورد مدیریت مشتریار</h2><p>وضعیت فروشگاه‌ها و نوبت‌های مربوط به حساب مدیریتی خود را بررسی کن.</p><div class="btn-row"><button class="btn" onclick="showPage('panel')">رفتن به مدیریت</button></div></div>
  <div class="stats"><div class="stat"><strong id="statVendors">0</strong><span>فروشگاه</span></div><div class="stat"><strong id="statBookings">0</strong><span>رزرو ثبت‌شده</span></div><div class="stat"><strong>۲۴/۷</strong><span>دستیار آزمایشی</span></div></div>
@@ -126,14 +99,15 @@ window.moshtaryarLogin = async function(event) {
 <section id="page-new-vendor" class="page">
  <div class="section-title"><h2 id="vendorFormTitle">ثبت فروشندهٔ جدید</h2></div>
  <form id="vendorForm" class="form-card">
-  <div class="notice">برای درخواست همکاری به‌عنوان آرایشگر، با حساب خود وارد شو و اطلاعات آرایشگاهت را ثبت کن. پس از تأیید سوپرادمین، نقش آرایشگر و دسترسی به همین فروشگاه خودکار فعال می‌شود. برای خدمات چندگانه، هر خدمت را در یک خط بنویس؛ قالب: نام خدمت - قیمت.</div>
+  <div class="notice">برای درخواست همکاری به‌عنوان آرایشگر، با حساب خود وارد شو و اطلاعات آرایشگاهت را ثبت کن. پس از تأیید سوپرادمین، نقش آرایشگر و دسترسی به همین فروشگاه خودکار فعال می‌شود. هر خدمت را در یک خط بنویس: نام خدمت - قیمت - مدت به دقیقه. نمونه: اصلاح مو - ۲۰۰ هزار تومان - ۳۰</div>
   <div class="form-grid">
    <div class="full"><label for="nvName">نام فروشگاه یا کسب‌وکار *</label><input id="nvName" required maxlength="100" placeholder="مثلاً آرایشگاه بهار"></div>
    <div><label for="nvPhone">شماره تماس</label><input id="nvPhone" type="tel" placeholder="شماره تماس"></div>
    <div class="full"><label for="nvRubika">آیدی یا لینک روبیکای آرایشگاه (اختیاری)</label><input id="nvRubika" type="text" placeholder="آیدی یا لینک روبیکا"><small class="muted">فعلاً برای یادداشت و انتخاب دستی مقصد است؛ برنامه پیام را خودکار ارسال نمی‌کند.</small></div>
    <div><label for="nvHours">ساعات کاری</label><input id="nvHours" placeholder="مثلاً ۹ تا ۱۸"></div>
    <div class="full"><label for="nvAddress">آدرس</label><input id="nvAddress" placeholder="شهر، خیابان، پلاک"></div><div class="full"><button class="btn secondary" type="button" onclick="captureVendorLocation()">📍 ثبت موقعیت فعلی آرایشگاه</button><div id="vendorLocationMsg" class="notice">صاحب آرایشگاه باید هنگام حضور در محل، این دکمه را بزند تا موقعیت فروشگاه ثبت شود.</div><input id="nvLat" type="hidden"><input id="nvLng" type="hidden"></div>
-   <div class="full"><label for="nvServices">خدمات و قیمت‌ها</label><textarea id="nvServices" placeholder="اصلاح مو - ۲۰۰ هزار تومان&#10;رنگ مو - از ۵۰۰ هزار تومان"></textarea></div>
+   <div class="full"><label for="nvServices">خدمات و قیمت‌ها</label><textarea id="nvServices" placeholder="اصلاح مو - ۲۰۰ هزار تومان - ۳۰&#10;رنگ مو - از ۵۰۰ هزار تومان - ۱۲۰"></textarea></div>
+   <div class="full"><label for="nvSchedule">برنامه هفتگی و ظرفیت روزانه</label><textarea id="nvSchedule" placeholder="شنبه - ۰۹:۰۰ تا ۱۷:۰۰ - ظرفیت ۸&#10;یکشنبه - ۱۰:۰۰ تا ۱۸:۰۰ - ظرفیت ۶&#10;دوشنبه - تعطیل&#10;سه‌شنبه - ۰۹:۰۰ تا ۱۷:۰۰ - ظرفیت ۸&#10;چهارشنبه - ۰۹:۰۰ تا ۱۷:۰۰ - ظرفیت ۸&#10;پنجشنبه - ۰۹:۰۰ تا ۱۴:۰۰ - ظرفیت ۵&#10;جمعه - تعطیل"></textarea><small class="muted">برای هر روز یک خط بنویس. ساعت‌ها ۲۴ساعته و ظرفیت تعداد مشتری همان روز است.</small></div>
    <div class="full"><label for="nvFaq">توضیحات یا پاسخ‌های متداول</label><textarea id="nvFaq" placeholder="مثلاً برای رزرو تماس بگیرید؛ پارکینگ داریم."></textarea></div>
   </div>
   <div class="btn-row"><button class="btn" type="submit">ذخیره فروشگاه</button><button class="btn light" type="button" onclick="resetVendorForm()">پاک‌کردن فرم</button></div>
@@ -146,7 +120,7 @@ window.moshtaryarLogin = async function(event) {
   <label for="bookVendor">انتخاب فروشگاه *</label><select id="bookVendor" required></select>
   <label for="bookName">نام شما *</label><input id="bookName" required maxlength="80" placeholder="نام و نام خانوادگی">
   <label for="bookPhone">شماره تماس *</label><input id="bookPhone" required type="tel" maxlength="30" placeholder="شماره تماس">
-  <label for="bookService">خدمت موردنظر</label><input id="bookService" placeholder="مثلاً ویزیت یا اصلاح مو">
+  <label for="bookService">خدمت موردنظر *</label><select id="bookService" required><option value="">ابتدا فروشگاه را انتخاب کن</option></select>
   <div class="form-grid"><div><label for="bookDate">تاریخ شمسی *</label><input id="bookDate" required type="text" inputmode="none" readonly placeholder="برای انتخاب تاریخ بزن" aria-haspopup="dialog" aria-expanded="false"><div id="jalaliCalendar" class="jalali-calendar" role="dialog" aria-label="انتخاب تاریخ شمسی"><div class="cal-head"><button type="button" class="btn secondary" id="calPrev" aria-label="ماه قبل">ماه قبل</button><span id="calTitle" class="cal-title"></span><button type="button" class="btn secondary" id="calNext" aria-label="ماه بعد">ماه بعد</button></div><div id="calGrid" class="cal-grid"></div></div></div><div><label for="bookTime">ساعت نوبت *</label><select id="bookTime" required><option value="">انتخاب ساعت</option></select><small class="muted">ساعت را از فهرست انتخاب کن.</small></div></div>
   <label for="bookNote">توضیحات (اختیاری)</label><textarea id="bookNote" placeholder="توضیح اضافه"></textarea>
   <div class="btn-row"><button class="btn" type="submit">ثبت نوبت</button></div>
@@ -371,7 +345,7 @@ function normalizeService(s){
  if(needsPrice && m && m[1].trim()) return {...s,name:m[1].trim(),price:m[2].trim()};
  return s;
 }
-vendors=vendors.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
+vendors=vendors.map(v=>({...v,services:(v.services||[]).map(x=>({...normalizeService(x),durationMinutes:Number(x.durationMinutes)||30}))}));
 if(!Array.isArray(bookings))bookings=[];
 let cloudReady=false;
 let currentUser=null;
@@ -416,7 +390,7 @@ async function loadCloudData(){
     // Load vendors first: booking queries for managers depend on their vendor IDs.
     const cv = await window.MoshtaryarCloud.getVendors(currentRole);
     const cb = await window.MoshtaryarCloud.getBookings(currentRole, cv);
-    if(cv.length) vendors=cv.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
+    if(cv.length) vendors=cv.map(v=>({...v,services:(v.services||[]).map(x=>({...normalizeService(x),durationMinutes:Number(x.durationMinutes)||30}))}));
     if(cb.length) bookings=cb;
     localSaveAll();
     renderHome(); renderVendors(); populateSelects(); renderPanel();
@@ -549,13 +523,27 @@ function toFaDigits(s){return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[
 function renderJCalendar(){const dates=findJMonth(calY,calM);document.getElementById('calTitle').textContent=jMonths[calM-1]+' '+toFaDigits(calY);const grid=document.getElementById('calGrid');grid.innerHTML='';jWeek.forEach(w=>{const e=document.createElement('div');e.className='cal-week';e.textContent=w;grid.appendChild(e)});if(!dates.length){grid.innerHTML+='<div class="muted">تقویم در این دستگاه در دسترس نیست.</div>';return}const offset=(dates[0].getDay()+1)%7;for(let i=0;i<offset;i++){const blank=document.createElement('span');grid.appendChild(blank)}const today=new Date();today.setHours(0,0,0,0);dates.forEach(d=>{const jp=jalaliParts(d),b=document.createElement('button');b.type='button';b.className='cal-day';b.textContent=toFaDigits(jp.d);const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(d.getTime()===today.getTime())b.classList.add('today');if(dateInput.dataset.iso===iso)b.classList.add('selected');if(d<today)b.disabled=true;b.addEventListener('click',()=>{dateInput.value=[jp.y,jp.m,jp.d].map((n,i)=>i===0?String(n):String(n).padStart(2,'0')).join('/');dateInput.dataset.iso=iso;calendarBox.classList.remove('open');dateInput.setAttribute('aria-expanded','false');dateInput.dispatchEvent(new Event('change',{bubbles:true}))});grid.appendChild(b)})}
 dateInput.addEventListener('click',()=>{calendarBox.classList.toggle('open');dateInput.setAttribute('aria-expanded',calendarBox.classList.contains('open')?'true':'false');if(calendarBox.classList.contains('open'))renderJCalendar()});
 document.getElementById('calPrev').addEventListener('click',()=>{calM--;if(calM<1){calM=12;calY--}renderJCalendar()});document.getElementById('calNext').addEventListener('click',()=>{calM++;if(calM>12){calM=1;calY++}renderJCalendar()});
+function digitsToAscii(x){return String(x||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d));}
 function parseServices(raw){return raw.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{
- const m=line.match(/^(.*?)\s*(?:[-–—:]\s*)?((?:[۰-۹0-9][۰-۹0-9.,٬]*)\s*(?:(?:هزار|میلیون)\s*)?(?:تومان|تومن|ریال)|(?:[۰-۹0-9][۰-۹0-9.,٬]*)\s*(?:هزارتومان|هزارتومن))\s*$/);
- if(m && m[1].trim())return {name:m[1].trim(),price:m[2].trim()};
- const i=line.indexOf('-');
- if(i>=0){const name=line.slice(0,i).trim(),price=line.slice(i+1).trim();return {name,price:price||'برای قیمت تماس بگیرید'}}
- return {name:line,price:'برای قیمت تماس بگیرید'}
+ const parts=line.split(/\s*[-–—]\s*/); let name=parts[0]||'', price=parts[1]||'برای قیمت تماس بگیرید';
+ const dm=digitsToAscii(parts.slice(2).join(' ')).match(/\d+/); const durationMinutes=dm?Math.max(5,Math.min(720,Number(dm[0]))):30;
+ return {name:name.trim(),price:price.trim(),durationMinutes};
 })}
+function parseWeeklySchedule(raw){
+ const keys=['sat','sun','mon','tue','wed','thu','fri'];
+ const names=[['شنبه','sat'],['یکشنبه','sun'],['دوشنبه','mon'],['سه‌شنبه','tue'],['سه شنبه','tue'],['چهارشنبه','wed'],['پنجشنبه','thu'],['جمعه','fri']];
+ const out={};
+ raw.split('\n').map(x=>x.trim()).filter(Boolean).forEach(line=>{
+  const day=names.find(([n])=>line.includes(n)); if(!day)return; const key=day[1];
+  if(line.includes('تعطیل')){out[key]={closed:true};return;}
+  const m=digitsToAscii(line).match(/(\d{1,2}:\d{2})\s*(?:تا|[-–])\s*(\d{1,2}:\d{2})/);
+  const c=digitsToAscii(line).match(/ظرفیت\s*(\d+)/);
+  if(m){out[key]={closed:false,start:m[1].padStart(5,'0'),end:m[2].padStart(5,'0'),capacity:c?Math.max(1,Math.min(100,Number(c[1]))):8};}
+ });
+ return out;
+}
+function weeklyScheduleText(schedule){const labels={sat:'شنبه',sun:'یکشنبه',mon:'دوشنبه',tue:'سه‌شنبه',wed:'چهارشنبه',thu:'پنجشنبه',fri:'جمعه'};return Object.entries(labels).map(([k,n])=>{const d=schedule?.[k];return !d?'':d.closed?`${n} - تعطیل`:`${n} - ${d.start} تا ${d.end} - ظرفیت ${d.capacity||8}`}).filter(Boolean).join('\n')}
+
 function resetVendorForm(){
   editingVendorId=null;
   document.getElementById('vendorForm').reset();
@@ -575,7 +563,8 @@ function editVendor(id){
   document.getElementById('nvLat').value=v.lat??'';
   document.getElementById('nvLng').value=v.lng??'';
   document.getElementById('vendorLocationMsg').textContent=(v.lat!=null&&v.lng!=null)?'موقعیت این آرایشگاه ثبت شده است.':'موقعیت آرایشگاه هنوز ثبت نشده است.';
-  document.getElementById('nvServices').value=(v.services||[]).map(s=>`${s.name||''} - ${s.price||''}`).join('\n');
+  document.getElementById('nvServices').value=(v.services||[]).map(x=>`${x.name||''} - ${x.price||''} - ${x.durationMinutes||30}`).join('\n');
+  const sch=document.getElementById('nvSchedule');if(sch)sch.value=weeklyScheduleText(v.schedule);
   document.getElementById('nvFaq').value=v.faq||'';
   document.getElementById('vendorFormMsg').textContent='اطلاعات را تغییر بده و روی «ذخیره فروشگاه» بزن.';
   showPage('new-vendor');
@@ -594,6 +583,7 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
     lat:document.getElementById('nvLat').value.trim()===''?null:Number(document.getElementById('nvLat').value),
     lng:document.getElementById('nvLng').value.trim()===''?null:Number(document.getElementById('nvLng').value),
     services:parseServices(document.getElementById('nvServices').value),
+    schedule:parseWeeklySchedule(document.getElementById('nvSchedule')?.value||''),
     faq:document.getElementById('nvFaq').value.trim()
   };
   let v;
@@ -615,9 +605,9 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
   document.getElementById('bookVendor').value=savedId;
   showPage('vendors');
 });
-function populateSelects(){const opts=vendors.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');const b=document.getElementById('bookVendor'),c=document.getElementById('chatVendor');const oldB=b.value,oldC=c.value;b.innerHTML=opts||'<option value="">ابتدا فروشنده ثبت کن</option>';c.innerHTML=opts||'<option value="">ابتدا فروشنده ثبت کن</option>';if(vendors.some(v=>v.id===oldB))b.value=oldB;else if(vendors.length)b.value=vendors[vendors.length-1].id;if(vendors.some(v=>v.id===oldC))c.value=oldC;else if(vendors.length)c.value=vendors[vendors.length-1].id}
+function populateSelects(){const opts=vendors.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');const b=document.getElementById('bookVendor'),c=document.getElementById('chatVendor');const oldB=b.value,oldC=c.value;b.innerHTML=opts||'<option value="">ابتدا فروشنده ثبت کن</option>';c.innerHTML=opts||'<option value="">ابتدا فروشنده ثبت کن</option>';if(vendors.some(v=>v.id===oldB))b.value=oldB;else if(vendors.length)b.value=vendors[vendors.length-1].id;if(vendors.some(v=>v.id===oldC))c.value=oldC;else if(vendors.length)c.value=vendors[vendors.length-1].id;if(typeof refreshBookingServices==='function')refreshBookingServices()}
 let latestBookingForShare=null;
-document.getElementById('bookingForm').addEventListener('submit',async e=>{e.preventDefault();if(!vendors.length){document.getElementById('bookingMsg').textContent='ابتدا یک فروشنده ثبت کن.';return}const v=vendors.find(x=>x.id===document.getElementById('bookVendor').value);const item={id:'b-'+Date.now(),customerUid:currentUser?.uid||null,vendorId:v?.id,vendorName:v?.name||'',vendorPhone:v?.phone||'',vendorRubika:v?.rubika||'',name:document.getElementById('bookName').value.trim(),phone:document.getElementById('bookPhone').value.trim(),service:document.getElementById('bookService').value.trim(),date:document.getElementById('bookDate').value,time:document.getElementById('bookTime').value,note:document.getElementById('bookNote').value.trim(),status:'در انتظار تأیید'};if(bookings.some(b=>b.vendorId===item.vendorId&&b.date===item.date&&b.time===item.time)){document.getElementById('bookingMsg').textContent='⚠️ این نوبت قبلاً رزرو شده است. لطفاً تاریخ یا ساعت دیگری انتخاب کن.';return}bookings.push(item);await saveAll();latestBookingForShare=item;document.getElementById('shareBookingBtn').hidden=false;e.target.reset();populateSelects();document.getElementById('bookingMsg').textContent='✅ درخواست نوبت ثبت شد. برای فرستادن درخواست، دکمهٔ «ارسال درخواست از طریق روبیکا» را بزن و روبیکا را در فهرست اشتراک‌گذاری انتخاب کن. تا وقتی پیام را خودت نفرستی، فروشگاه باخبر نمی‌شود و نوبت تأیید نشده است.';renderHome()});
+document.getElementById('bookingForm').addEventListener('submit',async e=>{e.preventDefault();if(!vendors.length){document.getElementById('bookingMsg').textContent='ابتدا یک فروشنده ثبت کن.';return}const v=vendors.find(x=>x.id===document.getElementById('bookVendor').value);const item={id:'b-'+Date.now(),customerUid:currentUser?.uid||null,vendorId:v?.id,vendorName:v?.name||'',vendorPhone:v?.phone||'',vendorRubika:v?.rubika||'',name:document.getElementById('bookName').value.trim(),phone:document.getElementById('bookPhone').value.trim(),service:document.getElementById('bookService').value.trim(),durationMinutes:Number(selectedBookService()?.durationMinutes)||30,date:document.getElementById('bookDate').value,time:document.getElementById('bookTime').value,note:document.getElementById('bookNote').value.trim(),status:'در انتظار تأیید'};if(bookings.some(b=>b.vendorId===item.vendorId&&b.date===item.date&&b.time===item.time)){document.getElementById('bookingMsg').textContent='⚠️ این نوبت قبلاً رزرو شده است. لطفاً تاریخ یا ساعت دیگری انتخاب کن.';return}bookings.push(item);await saveAll();latestBookingForShare=item;document.getElementById('shareBookingBtn').hidden=false;e.target.reset();populateSelects();document.getElementById('bookingMsg').textContent='✅ درخواست نوبت ثبت شد. برای فرستادن درخواست، دکمهٔ «ارسال درخواست از طریق روبیکا» را بزن و روبیکا را در فهرست اشتراک‌گذاری انتخاب کن. تا وقتی پیام را خودت نفرستی، فروشگاه باخبر نمی‌شود و نوبت تأیید نشده است.';renderHome()});
 async function shareLatestBooking(){if(!latestBookingForShare){document.getElementById('bookingMsg').textContent='ابتدا یک نوبت ثبت کن.';return}const b=latestBookingForShare;const message='درخواست نوبت از مشتریار\nفروشگاه: '+b.vendorName+'\nنام مشتری: '+b.name+'\nشماره تماس مشتری: '+b.phone+'\nخدمت: '+(b.service||'ذکر نشده')+'\nتاریخ: '+b.date+'\nساعت: '+b.time+'\nتوضیحات: '+(b.note||'ندارد')+'\n\nلطفاً امکان نوبت را تأیید کنید. این پیام درخواست است و نوبت تا زمان تأیید فروشگاه قطعی نیست.';try{if(navigator.share){await navigator.share({title:'درخواست نوبت مشتریار',text:message})}else if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(message);alert('متن درخواست کپی شد. روبیکا را باز کن و آن را برای صاحب فروشگاه بفرست.')}else{prompt('متن درخواست را کپی کن و در روبیکا بفرست:',message)}}catch(err){if(err&&err.name!=='AbortError'){prompt('اگر برگهٔ اشتراک‌گذاری باز نشد، متن را کپی کن و در روبیکا بفرست:',message)}}}
 function bookThis(id){populateSelects();document.getElementById('bookVendor').value=id;showPage('booking')}
 function chatAbout(id){populateSelects();document.getElementById('chatVendor').value=id;showPage('chat');document.getElementById('chatInput').focus()}
@@ -673,7 +663,26 @@ document.getElementById('chatForm').addEventListener('submit',e=>{e.preventDefau
 function quickAsk(q){document.getElementById('chatInput').value=q;document.getElementById('chatForm').requestSubmit()}
 document.getElementById('vendorSearch').addEventListener('search',renderVendors);
 const timeSelect=document.getElementById('bookTime');
-for(let mins=7*60;mins<=20*60;mins+=30){const hh=String(Math.floor(mins/60)).padStart(2,'0'),mm=String(mins%60).padStart(2,'0');const opt=document.createElement('option');opt.value=hh+':'+mm;opt.textContent=toFaDigits(hh)+':'+toFaDigits(mm);timeSelect.appendChild(opt)}
+function selectedBookVendor(){return vendors.find(v=>v.id===document.getElementById('bookVendor').value)}
+function selectedBookService(){const v=selectedBookVendor();return (v?.services||[]).find(x=>x.name===document.getElementById('bookService').value)}
+function refreshBookingServices(){const v=selectedBookVendor(),sel=document.getElementById('bookService'),old=sel.value;sel.innerHTML='<option value="">انتخاب خدمت</option>'+(v?.services||[]).map(x=>`<option value="${esc(x.name)}">${esc(x.name)} — ${esc(x.price||'استعلام')} (${Number(x.durationMinutes)||30} دقیقه)</option>`).join('');if((v?.services||[]).some(x=>x.name===old))sel.value=old;refreshBookingTimes()}
+function refreshBookingTimes(){
+ const v=selectedBookVendor(),svc=selectedBookService(),iso=document.getElementById('bookDate').dataset.iso,sel=timeSelect,old=sel.value;
+ sel.innerHTML='<option value="">ابتدا خدمت و تاریخ را انتخاب کن</option>';
+ if(!v||!svc||!iso)return;
+ const dt=new Date(iso+'T12:00:00'),day=['sun','mon','tue','wed','thu','fri','sat'][dt.getDay()];
+ const cfg=v.schedule?.[day]; if(!cfg||cfg.closed||!cfg.start||!cfg.end){sel.innerHTML='<option value="">این روز تعطیل است یا ساعت کاری تنظیم نشده</option>';return;}
+ const toMin=t=>{const a=t.split(':').map(Number);return a[0]*60+a[1]};const start=toMin(cfg.start),end=toMin(cfg.end),dur=Number(svc.durationMinutes)||30,cap=Number(cfg.capacity)||8;
+ const dayBookings=bookings.filter(b=>b.vendorId===v.id&&b.date===document.getElementById('bookDate').value&&b.status!=='رد شده');
+ if(dayBookings.length>=cap){sel.innerHTML='<option value="">ظرفیت این روز تکمیل شده است</option>';return;}
+ const occupied=dayBookings.map(b=>{const st=toMin(b.time||'00:00');const bs=(v.services||[]).find(x=>x.name===b.service);return [st,st+(Number(b.durationMinutes)||Number(bs?.durationMinutes)||30)];});
+ const options=[];for(let t=start;t+dur<=end;t+=15){const overlap=occupied.some(([a,z])=>t<z&&t+dur>a);if(!overlap)options.push(t);}
+ if(!options.length){sel.innerHTML='<option value="">برای این مدت زمان، ساعت آزادی وجود ندارد</option>';return;}
+ options.forEach(t=>{const hh=String(Math.floor(t/60)).padStart(2,'0'),mm=String(t%60).padStart(2,'0'),value=hh+':'+mm,opt=document.createElement('option');opt.value=value;opt.textContent=toFaDigits(value);sel.appendChild(opt)});
+ if(options.some(t=>{const x=String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');return x===old}))sel.value=old;
+}
+document.getElementById('bookVendor').addEventListener('change',refreshBookingServices);document.getElementById('bookService').addEventListener('change',refreshBookingTimes);document.getElementById('bookDate').addEventListener('change',refreshBookingTimes);
+
 renderHome();renderVendors();populateSelects();renderPanel();
 </script>
 
@@ -718,7 +727,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
       const p=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
       currentRole=normalizeRole(p?.role);
       const vs=await window.MoshtaryarCloud.getVendors(currentRole);
-      vendors=vs.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
+      vendors=vs.map(v=>({...v,services:(v.services||[]).map(x=>({...normalizeService(x),durationMinutes:Number(x.durationMinutes)||30}))}));
       bookings=await window.MoshtaryarCloud.getBookings(currentRole,vendors);
       localSaveAll(); applyRoleUI(); renderHome(); renderVendors(); populateSelects(); renderPanel();
     }catch(e){console.error(e);document.getElementById('authMsg').textContent='ورود انجام شد، اما اطلاعات ابری خوانده نشد. Rules و تنظیمات Firebase را بررسی کن.';}
@@ -750,6 +759,8 @@ renderHome();renderVendors();populateSelects();renderPanel();
     const box=document.getElementById('panelBookingsList');
     if(currentRole==='customer'){box.innerHTML='<div class="empty">پنل مدیریت فقط برای آرایشگر و سوپرادمین است.</div>';return;}
     const admin=currentRole==='super_admin';
+    const applicationsSection=document.getElementById('managerApplicationsSection');
+    if(applicationsSection) applicationsSection.hidden=!admin;
     box.innerHTML=bookings.length?bookings.slice().reverse().map(b=>{
       const s=b.status||'در انتظار تأیید', cls=s==='تأیید شده'?'status-approved':s==='رد شده'?'status-rejected':'status-pending';
       const actions=(!admin&&currentRole!=='store_manager')?'':(s==='در انتظار تأیید'?`<button class="btn" onclick="setBookingStatus('${esc(b.id)}','تأیید شده')">تأیید نوبت</button><button class="btn secondary" onclick="setBookingStatus('${esc(b.id)}','رد شده')">رد نوبت</button>`:admin?`<button class="btn secondary" onclick="setBookingStatus('${esc(b.id)}','در انتظار تأیید')">بازگرداندن</button>`:'');
