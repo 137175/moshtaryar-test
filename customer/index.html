@@ -672,7 +672,45 @@ function answerQuestion(question){
  if(found.includes('duration')){const items=service?[service]:list;out.push(items.length?`مدت ثبت‌شدهٔ خدمات${service?' موردنظر':''}:\n`+items.map(s=>`• ${s.name}: ${s.duration||s.durationMinutes||s.minutes||s.time||'مدت ثبت نشده'}`).join('\n'):'مدت خدمات در اطلاعات فروشگاه ثبت نشده است.');}
  if(found.includes('address'))out.push(`آدرس ${v.name}: ${v.address||'در اطلاعات فروشگاه ثبت نشده است.'}`);
  if(found.includes('phone'))out.push(`شماره تماس ${v.name}: ${v.phone||'در اطلاعات فروشگاه ثبت نشده است.'}`);
- if(found.includes('hours'))out.push(`ساعات کاری ${v.name}: ${v.hours||'در اطلاعات فروشگاه ثبت نشده است.'}`);
+ if(found.includes('hours')){
+  const hoursText=String(v.hours||'').trim();
+  const asksToday=/امروز|الان|فعلا|درحال حاضر/.test(q);
+  if(asksToday){
+   if(!hoursText){
+    out.push(`ساعات کاری ${v.name} ثبت نشده است؛ نمی‌توانم بگویم امروز باز است یا نه.`);
+   }else{
+    const normalizedHours=normalizeAssistantText(hoursText);
+    const timeMatches=[...normalizedHours.matchAll(/(\d{1,2})(?:[:٫](\d{1,2}))?\s*(صبح|بعد از ظهر|عصر|شب|بامداد)?/g)];
+    const parseHour=m=>{
+     let h=Number(m[1]),minute=Number(m[2]||0),suffix=m[3]||'';
+     if(suffix==='صبح'||suffix==='بامداد'){if(h===12)h=0;}
+     else if(suffix==='بعد از ظهر'||suffix==='عصر'||suffix==='شب'){if(h<12)h+=12;}
+     return h*60+minute;
+    };
+    const everyday=/هر\s*روز|همه\s*روز|تمام\s*روز/.test(normalizedHours);
+    const weekdays=['یکشنبه','دوشنبه','سه شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'];
+    const tehranNow=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Tehran'}));
+    const todayName=weekdays[tehranNow.getDay()];
+    const dayMentioned=weekdays.some(d=>normalizedHours.includes(d));
+    const dayIsOpen=everyday||(!dayMentioned)||normalizedHours.includes(todayName);
+    if(timeMatches.length>=2){
+     const start=parseHour(timeMatches[0]),end=parseHour(timeMatches[1]);
+     const now=tehranNow.getHours()*60+tehranNow.getMinutes();
+     const openNow=dayIsOpen&&(end>=start?(now>=start&&now<end):(now>=start||now<end));
+     const startText=String(Math.floor(start/60)).padStart(2,'0')+':'+String(start%60).padStart(2,'0');
+     const endText=String(Math.floor(end/60)).padStart(2,'0')+':'+String(end%60).padStart(2,'0');
+     const asksNow=/الان|فعلا|درحال حاضر/.test(q);
+     if(!dayIsOpen)out.push(`خیر، طبق برنامهٔ ثبت‌شده ${v.name} امروز تعطیل است.`);
+     else if(asksNow)out.push(openNow?`بله، ${v.name} همین الان باز است. ساعات کاری امروز: ${startText} تا ${endText} (به وقت ایران).`:`خیر، ${v.name} همین الان باز نیست. ساعات کاری امروز: ${startText} تا ${endText} (به وقت ایران).`);
+     else out.push(`بله، ${v.name} امروز باز است و ساعات کاری آن ${startText} تا ${endText} است (به وقت ایران).`);
+    }else{
+     out.push(`ساعات کاری ${v.name}: ${hoursText}. برای تشخیص اینکه همین الان باز است یا نه، ساعت شروع و پایان باید به‌صورت مشخص ثبت شده باشد.`);
+    }
+   }
+  }else{
+   out.push(`ساعات کاری ${v.name}: ${hoursText||'در اطلاعات فروشگاه ثبت نشده است.'}`);
+  }
+ }
  if(found.includes('booking'))out.push(`برای ثبت نوبت ${v.name}، بخش «رزرو» را باز کن و فروشگاه، خدمت، تاریخ و ساعت را انتخاب کن. وضعیت نوبت را بعداً در بخش نوبت‌های من می‌بینی.`);
  if(found.includes('faq'))out.push(v.faq?`اطلاعات تکمیلی ثبت‌شده: ${v.faq}`:'برای این موضوع اطلاعاتی در پروندهٔ فروشگاه ثبت نشده است.');
  if(found.includes('price')){
