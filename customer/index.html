@@ -140,7 +140,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
  <div class="section-title"><h2>دستیار پاسخ‌گوی مشتریار 🤖</h2></div>
  <div class="chat-shell">
   <div class="chat-head">دستیار مشتریار <div class="chat-sub">پاسخ‌گویی هوشمندتر بر اساس اطلاعات واقعی فروشگاه‌ها؛ تشخیص چند سؤال هم‌زمان و پرسش تکمیلی در ابهام</div></div>
-  <div class="chat-select"><label for="chatVendor" style="margin-top:0">دربارهٔ کدام فروشگاه سؤال داری؟</label><select id="chatVendor" onchange="addBotMessage('اطلاعات فروشگاه انتخاب‌شده عوض شد. حالا می‌توانی دربارهٔ قیمت، خدمات، ساعت کاری یا آدرس سؤال کنی.')"></select></div>
+  <div class="chat-select"><label for="chatVendor" style="margin-top:0">دربارهٔ کدام فروشگاه سؤال داری؟</label><select id="chatVendor" onchange="chatContextVendorId=this.value;addBotMessage('اطلاعات فروشگاه انتخاب‌شده عوض شد. حالا می‌توانی دربارهٔ قیمت، خدمات، ساعت کاری یا آدرس سؤال کنی.')"></select></div>
   <div id="chatBox" class="chat-box" aria-live="polite"><div class="bubble bot">سلام! 👋 من دستیار مشتریار هستم. می‌توانم بر اساس اطلاعات فروشگاه به پرسش‌هایی مثل «آدرس کجاست؟»، «چه خدماتی دارید؟»، «قیمت چقدر است؟» و «چه ساعتی باز هستید؟» پاسخ بدهم.</div></div>
   <form id="chatForm" class="chat-form"><input id="chatInput" required autocomplete="off" placeholder="سؤالت را بنویس..."><button class="btn" type="submit">ارسال</button></form>
  </div>
@@ -598,7 +598,7 @@ let latestBookingForShare=null;
 document.getElementById('bookingForm').addEventListener('submit',async e=>{e.preventDefault();if(!vendors.length){document.getElementById('bookingMsg').textContent='ابتدا یک فروشنده ثبت کن.';return}const v=vendors.find(x=>x.id===document.getElementById('bookVendor').value);const item={id:'b-'+Date.now(),customerUid:currentUser?.uid||null,vendorId:v?.id,vendorName:v?.name||'',vendorPhone:v?.phone||'',vendorRubika:v?.rubika||'',name:document.getElementById('bookName').value.trim(),phone:document.getElementById('bookPhone').value.trim(),service:document.getElementById('bookService').value.trim(),date:document.getElementById('bookDate').value,time:document.getElementById('bookTime').value,note:document.getElementById('bookNote').value.trim(),status:'در انتظار تأیید'};if(bookings.some(b=>b.vendorId===item.vendorId&&b.date===item.date&&b.time===item.time)){document.getElementById('bookingMsg').textContent='⚠️ این نوبت قبلاً رزرو شده است. لطفاً تاریخ یا ساعت دیگری انتخاب کن.';return}bookings.push(item);await saveAll();latestBookingForShare=item;document.getElementById('shareBookingBtn').hidden=false;e.target.reset();populateSelects();document.getElementById('bookingMsg').textContent='✅ درخواست نوبت ثبت شد. برای فرستادن درخواست، دکمهٔ «ارسال درخواست از طریق روبیکا» را بزن و روبیکا را در فهرست اشتراک‌گذاری انتخاب کن. تا وقتی پیام را خودت نفرستی، فروشگاه باخبر نمی‌شود و نوبت تأیید نشده است.';renderHome()});
 async function shareLatestBooking(){if(!latestBookingForShare){document.getElementById('bookingMsg').textContent='ابتدا یک نوبت ثبت کن.';return}const b=latestBookingForShare;const message='درخواست نوبت از مشتریار\nفروشگاه: '+b.vendorName+'\nنام مشتری: '+b.name+'\nشماره تماس مشتری: '+b.phone+'\nخدمت: '+(b.service||'ذکر نشده')+'\nتاریخ: '+b.date+'\nساعت: '+b.time+'\nتوضیحات: '+(b.note||'ندارد')+'\n\nلطفاً امکان نوبت را تأیید کنید. این پیام درخواست است و نوبت تا زمان تأیید فروشگاه قطعی نیست.';try{if(navigator.share){await navigator.share({title:'درخواست نوبت مشتریار',text:message})}else if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(message);alert('متن درخواست کپی شد. روبیکا را باز کن و آن را برای صاحب فروشگاه بفرست.')}else{prompt('متن درخواست را کپی کن و در روبیکا بفرست:',message)}}catch(err){if(err&&err.name!=='AbortError'){prompt('اگر برگهٔ اشتراک‌گذاری باز نشد، متن را کپی کن و در روبیکا بفرست:',message)}}}
 function bookThis(id){populateSelects();document.getElementById('bookVendor').value=id;showPage('booking')}
-function chatAbout(id){populateSelects();document.getElementById('chatVendor').value=id;showPage('chat');document.getElementById('chatInput').focus()}
+function chatAbout(id){populateSelects();document.getElementById('chatVendor').value=id;chatContextVendorId=id;showPage('chat');document.getElementById('chatInput').focus()}
 function renderPanel(){
   const box=document.getElementById('panelBookingsList');
   box.innerHTML=bookings.length?bookings.slice().reverse().map(b=>{
@@ -644,6 +644,8 @@ document.getElementById('confirmDeleteModal').addEventListener('click',e=>{
 async function deleteVendor(id){if(confirm('این فروشگاه حذف شود؟ نوبت‌های قبلی آن باقی می‌مانند.')){vendors=vendors.filter(v=>v.id!==id);await saveAll();populateSelects();renderPanel();renderVendors();renderHome()}}
 async function clearBookings(){if(confirm('همهٔ نوبت‌ها حذف شوند؟')){bookings=[];await saveAll();renderPanel();renderHome()}}
 function selectedVendor(){return vendors.find(v=>v.id===document.getElementById('chatVendor').value)}
+let chatContextVendorId=null;
+function chatContextVendor(){return vendors.find(v=>v.id===chatContextVendorId)||selectedVendor()}
 function addBotMessage(text){const box=document.getElementById('chatBox');const d=document.createElement('div');d.className='bubble bot';d.textContent=text;box.appendChild(d);box.scrollTop=box.scrollHeight}
 function addUserMessage(text){const box=document.getElementById('chatBox');const d=document.createElement('div');d.className='bubble user';d.textContent=text;box.appendChild(d);box.scrollTop=box.scrollHeight}
 function normalizeAssistantText(value){return String(value||'').toLocaleLowerCase('fa').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[\u064B-\u065F\u0670]/g,'').replace(/[؟?!،؛,:.()\[\]{}"'`]/g,' ').replace(/[\u200c\sـ]+/g,' ').trim()}
@@ -652,22 +654,29 @@ function answerQuestion(question){
  // اگر مشتری نام فروشگاه را در خود سؤال گفته باشد، همان فروشگاه اولویت دارد؛
  // انتخاب قبلی فهرست نباید باعث پاسخ از اطلاعات فروشگاه اشتباه شود.
  // نام فروشگاه را مستقل از فروشگاه انتخاب‌شده پیدا کن؛ فاصله، نیم‌فاصله و چسبیده‌نویسی نادیده گرفته می‌شود.
- const compactQ=q.replace(/\\s+/g,'');
+ const compactQ=q.replace(/\s+/g,'');
  const genericVendorWords=new Set(['آرایشگاه','سالن','زیبایی','فروشگاه','مرکز']);
  const namedVendor=(vendors||[]).map(item=>{
   const name=normalizeAssistantText(item.name);
-  const compactName=name.replace(/\\s+/g,'');
+  const compactName=name.replace(/\s+/g,'');
   const distinctiveTokens=name.split(' ').filter(token=>token.length>1&&!genericVendorWords.has(token));
   const exact=!!compactName&&compactQ.includes(compactName);
-  const allDistinctive=distinctiveTokens.length>0&&distinctiveTokens.every(token=>compactQ.includes(token.replace(/\\s+/g,'')));
+  const allDistinctive=distinctiveTokens.length>0&&distinctiveTokens.every(token=>compactQ.includes(token.replace(/\s+/g,'')));
   const score=exact?10000+compactName.length:allDistinctive?100+distinctiveTokens.join('').length:0;
   return {item,score};
  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score)[0]?.item;
- const v=namedVendor||selectedVendor();if(!v)return 'هنوز فروشگاهی انتخاب نشده است. ابتدا یک فروشگاه انتخاب کن.';
+ const v=namedVendor||chatContextVendor();if(!v)return 'هنوز فروشگاهی انتخاب نشده است. ابتدا یک فروشگاه انتخاب کن.';
+ chatContextVendorId=v.id;
  if(/^(سلام|درود|hi|hello|صبح بخیر|عصر بخیر)/.test(q))return `سلام! 😊 دربارهٔ ${v.name} چه چیزی می‌خواهی بدانی؟ قیمت، خدمات، مدت انجام، آدرس، شماره تماس، ساعت کاری یا رزرو؟`;
  if(/^(ممنون|مرسی|سپاس|تشکر|دمت گرم)/.test(q))return 'خواهش می‌کنم 🌷 سؤال دیگری داری؟';
  const intents={price:['قیمت','هزینه','چنده','چقدر','تعرفه','مبلغ','پول','گرونه','ارزونه'],services:['خدمات','سرویس','چه کار','چه کاری','انجام میدین','انجام میدید','دارین','دارید','ارائه'],address:['آدرس','نشانی','کجا','مکان','لوکیشن','مسیر'],phone:['تلفن','تماس','شماره','زنگ','موبایل','ارتباط'],hours:['ساعت','باز','بسته','کاری','چه وقت','کی باز','کی میبندین','چه زمانی'],duration:['مدت','چقدر طول','چند دقیقه','زمان انجام','طول میکشه'],booking:['رزرو','نوبت','وقت گرفتن','وقت میخوام','وقت میخواهم'],faq:['پارکینگ','پرداخت','کارتخوان','شرایط','توضیح','بیمه','مدرک','تخفیف']};
  const found=Object.entries(intents).filter(([k,words])=>words.some(w=>q.includes(normalizeAssistantText(w)))).map(([k])=>k);
+ // «ساعت کاریشون تا چنده؟» سؤال ساعت است، نه قیمت؛ قیمت فقط با نشانهٔ روشن قیمت فعال شود.
+ const explicitPriceIntent=/قیمت|هزینه|تعرفه|مبلغ|پول|ارزون|گرون/.test(q);
+ if(found.includes('hours')&&!explicitPriceIntent) {
+  const i=found.indexOf('price');
+  if(i>=0)found.splice(i,1);
+ }
  // Match the complete service name first. Never select a service merely because
  // it shares one generic word (for example «رنگ» in «رنگ مو» and «رنگ ابرو»).
  const service=(v.services||[]).map(s=>{
