@@ -674,7 +674,8 @@ function answerQuestion(question){
  if(found.includes('phone'))out.push(`شماره تماس ${v.name}: ${v.phone||'در اطلاعات فروشگاه ثبت نشده است.'}`);
  if(found.includes('hours')){
   const hoursText=String(v.hours||'').trim();
-  const asksToday=/امروز|الان|فعلا|درحال حاضر/.test(q);
+  const rawQuestion=String(question||'').toLocaleLowerCase('fa').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[\u200c\sـ]+/g,' ').trim();
+  const asksToday=/امروز|امروز باز|الان|فعلا|درحال حاضر/.test(rawQuestion)||/امروز|الان|فعلا|درحال حاضر/.test(q);
   if(asksToday){
    if(!hoursText){
     out.push(`ساعات کاری ${v.name} ثبت نشده است؛ نمی‌توانم بگویم امروز باز است یا نه.`);
@@ -687,7 +688,7 @@ function answerQuestion(question){
      else if(suffix==='بعد از ظهر'||suffix==='عصر'||suffix==='شب'){if(h<12)h+=12;}
      return h*60+minute;
     };
-    const everyday=/هر\s*روز|همه\s*روز|تمام\s*روز/.test(normalizedHours);
+    const everyday=/هر\s*روز|همه\s*روز|تمام\s*روز/.test(normalizedHours.replace(/\s+/g,''))||/همه\s*روز|تمام\s*روز/.test(normalizedHours);
     const weekdays=['یکشنبه','دوشنبه','سه شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'];
     const tehranNow=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Tehran'}));
     const todayName=weekdays[tehranNow.getDay()];
