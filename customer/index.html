@@ -139,12 +139,12 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 <section id="page-chat" class="page">
  <div class="section-title"><h2>دستیار پاسخ‌گوی مشتریار 🤖</h2></div>
  <div class="chat-shell">
-  <div class="chat-head">دستیار مشتریار <div class="chat-sub">پاسخ‌گویی بر اساس اطلاعات ثبت‌شدهٔ فروشگاه‌ها؛ بدون اتصال به مدل هوش مصنوعی آنلاین</div></div>
+  <div class="chat-head">دستیار مشتریار <div class="chat-sub">پاسخ‌گویی هوشمندتر بر اساس اطلاعات واقعی فروشگاه‌ها؛ تشخیص چند سؤال هم‌زمان و پرسش تکمیلی در ابهام</div></div>
   <div class="chat-select"><label for="chatVendor" style="margin-top:0">دربارهٔ کدام فروشگاه سؤال داری؟</label><select id="chatVendor" onchange="addBotMessage('اطلاعات فروشگاه انتخاب‌شده عوض شد. حالا می‌توانی دربارهٔ قیمت، خدمات، ساعت کاری یا آدرس سؤال کنی.')"></select></div>
   <div id="chatBox" class="chat-box" aria-live="polite"><div class="bubble bot">سلام! 👋 من دستیار مشتریار هستم. می‌توانم بر اساس اطلاعات فروشگاه به پرسش‌هایی مثل «آدرس کجاست؟»، «چه خدماتی دارید؟»، «قیمت چقدر است؟» و «چه ساعتی باز هستید؟» پاسخ بدهم.</div></div>
   <form id="chatForm" class="chat-form"><input id="chatInput" required autocomplete="off" placeholder="سؤالت را بنویس..."><button class="btn" type="submit">ارسال</button></form>
  </div>
- <div class="notice">این دستیار از پاسخ‌های قاعده‌محور استفاده می‌کند؛ ممکن است سؤال‌های پیچیده را نفهمد. اگر اطلاعاتی در پروندهٔ فروشگاه ثبت نشده باشد، آن را حدس نمی‌زند.</div>
+ <div class="notice">این دستیار رایگان و بدون اتصال به سرویس پولی است. پاسخ‌ها از اطلاعات ثبت‌شدهٔ فروشگاه می‌آیند؛ اگر چیزی ثبت نشده باشد، حدس نمی‌زند و برای سؤال مبهم از تو توضیح بیشتر می‌خواهد.</div>
  <div class="btn-row"><button class="btn secondary" onclick="quickAsk('قیمت خدمات چقدر است؟')">قیمت‌ها</button><button class="btn secondary" onclick="quickAsk('آدرس کجاست؟')">آدرس</button><button class="btn secondary" onclick="quickAsk('ساعات کاری چیست؟')">ساعات کاری</button><button class="btn secondary" onclick="quickAsk('چه خدماتی دارید؟')">خدمات</button></div>
 </section>
 <section id="page-panel" style="display:none" class="page">
@@ -646,7 +646,29 @@ async function clearBookings(){if(confirm('همهٔ نوبت‌ها حذف شو�
 function selectedVendor(){return vendors.find(v=>v.id===document.getElementById('chatVendor').value)}
 function addBotMessage(text){const box=document.getElementById('chatBox');const d=document.createElement('div');d.className='bubble bot';d.textContent=text;box.appendChild(d);box.scrollTop=box.scrollHeight}
 function addUserMessage(text){const box=document.getElementById('chatBox');const d=document.createElement('div');d.className='bubble user';d.textContent=text;box.appendChild(d);box.scrollTop=box.scrollHeight}
-function answerQuestion(question){const v=selectedVendor();if(!v)return 'هنوز فروشگاهی انتخاب نشده است. ابتدا یک فروشنده ثبت کن.';const q=question.toLocaleLowerCase('fa');const has=(words)=>words.some(w=>q.includes(w));if(has(['سلام','درود','صبح بخیر','عصر بخیر']))return `سلام! خوش آمدی 😊 دربارهٔ ${v.name} چه سؤالی داری؟ می‌توانی دربارهٔ قیمت، خدمات، آدرس، شماره تماس یا ساعات کاری بپرسی.`;if(has(['قیمت','هزینه','چنده','چقدر','تعرفه','مبلغ']))return (v.services?.length?`قیمت‌های ثبت‌شده برای ${v.name}:\n`+v.services.map(s=>`• ${s.name}: ${s.price||'ثبت نشده'}`).join('\n'):'برای این فروشگاه قیمتی ثبت نشده است.')+'\nبرای قیمت قطعی با فروشگاه تماس بگیر.';if(has(['آدرس','کجا','نشانی','مکان','لوکیشن']))return `آدرس ${v.name}: ${v.address||'در اطلاعات فروشگاه ثبت نشده است.'}`;if(has(['تلفن','تماس','شماره','زنگ']))return `شماره تماس ${v.name}: ${v.phone||'در اطلاعات فروشگاه ثبت نشده است.'}`;if(has(['ساعت','باز','بسته','کاری','چه وقت','کی باز']))return `ساعات کاری ${v.name}: ${v.hours||'در اطلاعات فروشگاه ثبت نشده است.'}`;if(has(['خدمت','سرویس','چه کار','انجام می','ارائه می']))return (v.services?.length?`خدمات ثبت‌شدهٔ ${v.name}:\n`+v.services.map(s=>`• ${s.name} — ${s.price||'قیمت نامشخص'}`).join('\n'):'هنوز خدماتی برای این فروشگاه ثبت نشده است.')+(v.faq?`\n\nاطلاعات بیشتر: ${v.faq}`:'');if(has(['رزرو','نوبت','وقت']))return `برای ثبت نوبت ${v.name}، از منوی پایین «رزرو» را باز کن و تاریخ و ساعت دلخواهت را وارد کن. توجه: ثبت اینجا به فروشگاه پیام ارسال نمی‌کند؛ برای تأیید با آن‌ها تماس بگیر.`;if(has(['ممنون','مرسی','سپاس']))return 'خواهش می‌کنم! 😊 اگر سؤال دیگری داری بپرس.';if(v.faq&&has(['توضیح','شرایط','پارکینگ','بیمه','پرداخت','مدرک']))return `اطلاعات ثبت‌شدهٔ فروشگاه:\n${v.faq}`;return `متوجه پرسشت نشدم. می‌توانم دربارهٔ اطلاعات ثبت‌شدهٔ ${v.name} کمک کنم. مثلاً بپرس:\n• قیمت خدمات چقدر است؟\n• آدرس کجاست؟\n• ساعات کاری چیست؟\n• چه خدماتی دارید؟\n• شماره تماس چیست؟`}
+function normalizeAssistantText(value){return String(value||'').toLocaleLowerCase('fa').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[\u064B-\u065F\u0670]/g,'').replace(/[؟?!،؛,:.()\[\]{}"'`]/g,' ').replace(/[\u200c\sـ]+/g,' ').trim()}
+function answerQuestion(question){
+ const v=selectedVendor();if(!v)return 'هنوز فروشگاهی انتخاب نشده است. ابتدا یک فروشگاه انتخاب کن.';
+ const q=normalizeAssistantText(question);
+ if(/^(سلام|درود|hi|hello|صبح بخیر|عصر بخیر)/.test(q))return `سلام! 😊 دربارهٔ ${v.name} چه چیزی می‌خواهی بدانی؟ قیمت، خدمات، مدت انجام، آدرس، شماره تماس، ساعت کاری یا رزرو؟`;
+ if(/^(ممنون|مرسی|سپاس|تشکر|دمت گرم)/.test(q))return 'خواهش می‌کنم 🌷 سؤال دیگری داری؟';
+ const intents={price:['قیمت','هزینه','چنده','چقدر','تعرفه','مبلغ','پول','گرونه','ارزونه'],services:['خدمات','سرویس','چه کار','چه کاری','انجام میدین','انجام میدید','دارین','دارید','ارائه'],address:['آدرس','نشانی','کجا','مکان','لوکیشن','مسیر'],phone:['تلفن','تماس','شماره','زنگ','موبایل','ارتباط'],hours:['ساعت','باز','بسته','کاری','چه وقت','کی باز','کی میبندین','چه زمانی'],duration:['مدت','چقدر طول','چند دقیقه','زمان انجام','طول میکشه'],booking:['رزرو','نوبت','وقت گرفتن','وقت میخوام','وقت میخواهم'],faq:['پارکینگ','پرداخت','کارتخوان','شرایط','توضیح','بیمه','مدرک','تخفیف']};
+ const found=Object.entries(intents).filter(([k,words])=>words.some(w=>q.includes(normalizeAssistantText(w)))).map(([k])=>k);
+ const service=(v.services||[]).find(s=>{const name=normalizeAssistantText(s.name);return name.length>1&&(q.includes(name)||name.split(' ').filter(x=>x.length>2).some(x=>q.includes(x)))});
+ if(service&&!found.some(x=>['price','duration','services'].includes(x)))found.push('price');
+ if(!found.length){if(v.faq&&q.length>3)return `اطلاعات تکمیلی ثبت‌شده برای ${v.name}:\n${v.faq}\n\nاگر منظورت مورد دیگری است، دقیق‌تر بگو: قیمت، خدمات، آدرس، تماس یا ساعت کاری؟`;return `برای اینکه پاسخ اشتباه ندهم، منظورت کدام مورد است؟\n۱) قیمت یک خدمت\n۲) فهرست خدمات\n۳) مدت انجام خدمت\n۴) آدرس یا شماره تماس\n۵) ساعت کاری\n۶) رزرو نوبت`}
+ const out=[];const list=v.services||[];
+ if(found.includes('price')){const items=service?[service]:list;out.push(items.length?`قیمت ${service?'خدمت '+service.name+' در ':''}${v.name}:\n`+items.map(s=>`• ${s.name}: ${s.price||'قیمت ثبت نشده'}`).join('\n'):'برای این فروشگاه خدمتی ثبت نشده است.');}
+ if(found.includes('services'))out.push(list.length?`خدمات ثبت‌شدهٔ ${v.name}:\n`+list.map(s=>`• ${s.name}${s.price?' — '+s.price:''}`).join('\n'):'هنوز خدمتی برای این فروشگاه ثبت نشده است.');
+ if(found.includes('duration')){const items=service?[service]:list;out.push(items.length?`مدت ثبت‌شدهٔ خدمات${service?' موردنظر':''}:\n`+items.map(s=>`• ${s.name}: ${s.duration||s.durationMinutes||s.minutes||s.time||'مدت ثبت نشده'}`).join('\n'):'مدت خدمات در اطلاعات فروشگاه ثبت نشده است.');}
+ if(found.includes('address'))out.push(`آدرس ${v.name}: ${v.address||'در اطلاعات فروشگاه ثبت نشده است.'}`);
+ if(found.includes('phone'))out.push(`شماره تماس ${v.name}: ${v.phone||'در اطلاعات فروشگاه ثبت نشده است.'}`);
+ if(found.includes('hours'))out.push(`ساعات کاری ${v.name}: ${v.hours||'در اطلاعات فروشگاه ثبت نشده است.'}`);
+ if(found.includes('booking'))out.push(`برای ثبت نوبت ${v.name}، بخش «رزرو» را باز کن و فروشگاه، خدمت، تاریخ و ساعت را انتخاب کن. وضعیت نوبت را بعداً در بخش نوبت‌های من می‌بینی.`);
+ if(found.includes('faq'))out.push(v.faq?`اطلاعات تکمیلی ثبت‌شده: ${v.faq}`:'برای این موضوع اطلاعاتی در پروندهٔ فروشگاه ثبت نشده است.');
+ if(found.includes('price'))out.push('قیمت‌ها فقط بر اساس اطلاعات ثبت‌شده نمایش داده شده‌اند؛ برای قیمت قطعی با فروشگاه هماهنگ کن.');
+ return out.join('\n\n');
+}
 document.getElementById('chatForm').addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('chatInput'),q=input.value.trim();if(!q)return;addUserMessage(q);input.value='';setTimeout(()=>addBotMessage(answerQuestion(q)),180)});
 function quickAsk(q){document.getElementById('chatInput').value=q;document.getElementById('chatForm').requestSubmit()}
 document.getElementById('vendorSearch').addEventListener('search',renderVendors);
