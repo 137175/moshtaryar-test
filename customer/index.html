@@ -648,8 +648,11 @@ function addBotMessage(text){const box=document.getElementById('chatBox');const 
 function addUserMessage(text){const box=document.getElementById('chatBox');const d=document.createElement('div');d.className='bubble user';d.textContent=text;box.appendChild(d);box.scrollTop=box.scrollHeight}
 function normalizeAssistantText(value){return String(value||'').toLocaleLowerCase('fa').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[\u064B-\u065F\u0670]/g,'').replace(/[؟?!،؛,:.()\[\]{}"'`]/g,' ').replace(/[\u200c\sـ]+/g,' ').trim()}
 function answerQuestion(question){
- const v=selectedVendor();if(!v)return 'هنوز فروشگاهی انتخاب نشده است. ابتدا یک فروشگاه انتخاب کن.';
  const q=normalizeAssistantText(question);
+ // اگر مشتری نام فروشگاه را در خود سؤال گفته باشد، همان فروشگاه اولویت دارد؛
+ // انتخاب قبلی فهرست نباید باعث پاسخ از اطلاعات فروشگاه اشتباه شود.
+ const namedVendor=(vendors||[]).map(item=>({item,name:normalizeAssistantText(item.name)})).filter(x=>x.name&&q.includes(x.name)).sort((a,b)=>b.name.length-a.name.length)[0]?.item;
+ const v=namedVendor||selectedVendor();if(!v)return 'هنوز فروشگاهی انتخاب نشده است. ابتدا یک فروشگاه انتخاب کن.';
  if(/^(سلام|درود|hi|hello|صبح بخیر|عصر بخیر)/.test(q))return `سلام! 😊 دربارهٔ ${v.name} چه چیزی می‌خواهی بدانی؟ قیمت، خدمات، مدت انجام، آدرس، شماره تماس، ساعت کاری یا رزرو؟`;
  if(/^(ممنون|مرسی|سپاس|تشکر|دمت گرم)/.test(q))return 'خواهش می‌کنم 🌷 سؤال دیگری داری؟';
  const intents={price:['قیمت','هزینه','چنده','چقدر','تعرفه','مبلغ','پول','گرونه','ارزونه'],services:['خدمات','سرویس','چه کار','چه کاری','انجام میدین','انجام میدید','دارین','دارید','ارائه'],address:['آدرس','نشانی','کجا','مکان','لوکیشن','مسیر'],phone:['تلفن','تماس','شماره','زنگ','موبایل','ارتباط'],hours:['ساعت','باز','بسته','کاری','چه وقت','کی باز','کی میبندین','چه زمانی'],duration:['مدت','چقدر طول','چند دقیقه','زمان انجام','طول میکشه'],booking:['رزرو','نوبت','وقت گرفتن','وقت میخوام','وقت میخواهم'],faq:['پارکینگ','پرداخت','کارتخوان','شرایط','توضیح','بیمه','مدرک','تخفیف']};
@@ -675,7 +678,7 @@ function answerQuestion(question){
  if(found.includes('hours')){
   const hoursText=String(v.hours||'').trim();
   const rawQuestion=String(question||'').toLocaleLowerCase('fa').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[\u200c\sـ]+/g,' ').trim();
-  const asksToday=/امروز|امروز باز|الان|فعلا|درحال حاضر/.test(rawQuestion)||/امروز|الان|فعلا|درحال حاضر/.test(q);
+  const asksToday=/امروز|الان|فعلا|درحال حاضر/.test(normalizeAssistantText(rawQuestion))||/امروز|الان|فعلا|درحال حاضر/.test(q);
   if(asksToday){
    if(!hoursText){
     out.push(`ساعات کاری ${v.name} ثبت نشده است؛ نمی‌توانم بگویم امروز باز است یا نه.`);
@@ -688,7 +691,8 @@ function answerQuestion(question){
      else if(suffix==='بعد از ظهر'||suffix==='عصر'||suffix==='شب'){if(h<12)h+=12;}
      return h*60+minute;
     };
-    const everyday=/هر\s*روز|همه\s*روز|تمام\s*روز/.test(normalizedHours.replace(/\s+/g,''))||/همه\s*روز|تمام\s*روز/.test(normalizedHours);
+    const compactHours=normalizedHours.replace(/\s+/g,'');
+    const everyday=/هرروز|همهروز|تمامروز/.test(compactHours);
     const weekdays=['یکشنبه','دوشنبه','سه شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'];
     const tehranNow=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Tehran'}));
     const todayName=weekdays[tehranNow.getDay()];
