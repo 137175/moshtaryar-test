@@ -651,7 +651,18 @@ function answerQuestion(question){
  const q=normalizeAssistantText(question);
  // اگر مشتری نام فروشگاه را در خود سؤال گفته باشد، همان فروشگاه اولویت دارد؛
  // انتخاب قبلی فهرست نباید باعث پاسخ از اطلاعات فروشگاه اشتباه شود.
- const namedVendor=(vendors||[]).map(item=>({item,name:normalizeAssistantText(item.name)})).filter(x=>x.name&&q.includes(x.name)).sort((a,b)=>b.name.length-a.name.length)[0]?.item;
+ // نام فروشگاه را مستقل از فروشگاه انتخاب‌شده پیدا کن؛ فاصله، نیم‌فاصله و چسبیده‌نویسی نادیده گرفته می‌شود.
+ const compactQ=q.replace(/\\s+/g,'');
+ const genericVendorWords=new Set(['آرایشگاه','سالن','زیبایی','فروشگاه','مرکز']);
+ const namedVendor=(vendors||[]).map(item=>{
+  const name=normalizeAssistantText(item.name);
+  const compactName=name.replace(/\\s+/g,'');
+  const distinctiveTokens=name.split(' ').filter(token=>token.length>1&&!genericVendorWords.has(token));
+  const exact=!!compactName&&compactQ.includes(compactName);
+  const allDistinctive=distinctiveTokens.length>0&&distinctiveTokens.every(token=>compactQ.includes(token.replace(/\\s+/g,'')));
+  const score=exact?10000+compactName.length:allDistinctive?100+distinctiveTokens.join('').length:0;
+  return {item,score};
+ }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score)[0]?.item;
  const v=namedVendor||selectedVendor();if(!v)return 'هنوز فروشگاهی انتخاب نشده است. ابتدا یک فروشگاه انتخاب کن.';
  if(/^(سلام|درود|hi|hello|صبح بخیر|عصر بخیر)/.test(q))return `سلام! 😊 دربارهٔ ${v.name} چه چیزی می‌خواهی بدانی؟ قیمت، خدمات، مدت انجام، آدرس، شماره تماس، ساعت کاری یا رزرو؟`;
  if(/^(ممنون|مرسی|سپاس|تشکر|دمت گرم)/.test(q))return 'خواهش می‌کنم 🌷 سؤال دیگری داری؟';
