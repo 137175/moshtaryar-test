@@ -43,7 +43,6 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 .status-approved{background:#d1f7df;color:#146c36}
 .status-rejected{background:#ffe0e0;color:#9b1c1c}
 
-.schedule-editor{display:grid;gap:8px;margin:8px 0}.schedule-row{display:grid;grid-template-columns:72px 1fr 1fr 90px auto;gap:7px;align-items:center;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:8px}.schedule-row strong{font-size:12px}.schedule-row input{padding:8px;font-size:12px}.schedule-row label{display:flex;align-items:center;gap:4px;margin:0;font-size:11px}.schedule-row label input{width:auto}.schedule-row .closed{white-space:nowrap}@media(max-width:520px){.schedule-row{grid-template-columns:65px 1fr 1fr 72px;gap:5px}.schedule-row .closed{grid-column:2/-1}.schedule-row input{min-width:0;padding:7px 5px}}
 </style>
 </head>
 <body>
@@ -111,8 +110,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
    <div class="full"><label for="nvRubika">آیدی یا لینک روبیکای آرایشگاه (اختیاری)</label><input id="nvRubika" type="text" placeholder="آیدی یا لینک روبیکا"><small class="muted">فعلاً برای یادداشت و انتخاب دستی مقصد است؛ برنامه پیام را خودکار ارسال نمی‌کند.</small></div>
    <div><label for="nvHours">ساعات کاری</label><input id="nvHours" placeholder="مثلاً ۹ تا ۱۸"></div>
    <div class="full"><label for="nvAddress">آدرس</label><input id="nvAddress" placeholder="شهر، خیابان، پلاک"></div><div class="full"><button class="btn secondary" type="button" onclick="captureVendorLocation()">📍 ثبت موقعیت فعلی آرایشگاه</button><div id="vendorLocationMsg" class="notice">صاحب آرایشگاه باید هنگام حضور در محل، این دکمه را بزند تا موقعیت فروشگاه ثبت شود.</div><input id="nvLat" type="hidden"><input id="nvLng" type="hidden"></div>
-   <div class="full"><label for="nvServices">خدمات، قیمت و مدت انجام</label><textarea id="nvServices" placeholder="اصلاح مو - ۲۰۰ هزار تومان - ۳۰&#10;رنگ مو - از ۵۰۰ هزار تومان - ۱۲۰"></textarea><small class="muted">هر خدمت در یک خط: نام خدمت - قیمت - مدت به دقیقه. اگر مدت را ننویسی، ۳۰ دقیقه در نظر گرفته می‌شود.</small></div>
-   <div class="full"><label>برنامه هفتگی و ظرفیت روزانه</label><div id="weeklyScheduleEditor" class="schedule-editor"></div><small class="muted">ساعت‌ها با قالب ۲۴ ساعته مثل 09:00 و 18:00 ثبت شوند. ظرفیت یعنی حداکثر تعداد نوبت روزانه.</small></div>
+   <div class="full"><label for="nvServices">خدمات و قیمت‌ها</label><textarea id="nvServices" placeholder="اصلاح مو - ۲۰۰ هزار تومان&#10;رنگ مو - از ۵۰۰ هزار تومان"></textarea></div>
    <div class="full"><label for="nvFaq">توضیحات یا پاسخ‌های متداول</label><textarea id="nvFaq" placeholder="مثلاً برای رزرو تماس بگیرید؛ پارکینگ داریم."></textarea></div>
   </div>
   <div class="btn-row"><button class="btn" type="submit">ذخیره فروشگاه</button><button class="btn light" type="button" onclick="resetVendorForm()">پاک‌کردن فرم</button></div>
@@ -281,19 +279,37 @@ async function getBookings(role, vs) {
   }
   return out;
 }
-async function approveVendorManager(vendor) {
-  if (!vendor?.id || !vendor?.ownerUid) throw new Error("درخواست آرایشگری اطلاعات مالک ندارد.");
+async function linkVendorManager(vendor, managerUid, approve=false) {
+  if (!vendor?.id || !managerUid) throw new Error("شناسه فروشگاه یا آرایشگر ناقص است.");
+  const userRef = doc(db,"users",managerUid);
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) throw new Error("حساب آرایشگر در مجموعه کاربران پیدا نشد.");
+  const oldProfile = userSnap.data() || {};
+  const storeIds = [...new Set([...(Array.isArray(oldProfile.storeIds)?oldProfile.storeIds:[]), vendor.id])];
   const batch = writeBatch(db);
-  batch.set(doc(db,"users",vendor.ownerUid), {
-    uid:vendor.ownerUid, role:"store_manager",
-    updatedAt:serverTimestamp()
+  batch.set(userRef, {
+    uid:managerUid, email:oldProfile.email || "", role:"store_manager",
+    storeId:vendor.id, storeIds, updatedAt:serverTimestamp()
   }, {merge:true});
   batch.set(doc(db,"vendors",vendor.id), {
-    status:"approved", managerUid:vendor.ownerUid,
-    managerApplication:false, managerApprovedAt:serverTimestamp(),
+    managerUid,
+    ...(approve ? {status:"approved",managerApplication:false,managerApprovedAt:serverTimestamp()} : {}),
     updatedAt:serverTimestamp()
   }, {merge:true});
   await batch.commit();
+  const [savedUser,savedVendor] = await Promise.all([getDoc(userRef),getDoc(doc(db,"vendors",vendor.id))]);
+  if (!savedUser.exists() || savedUser.data().role !== "store_manager" ||
+      savedUser.data().storeId !== vendor.id || !savedVendor.exists() ||
+      savedVendor.data().managerUid !== managerUid) {
+    throw new Error("تخصیص در پایگاه داده تأیید نشد؛ لطفاً دوباره بررسی شود.");
+  }
+}
+async function approveVendorManager(vendor) {
+  if (!vendor?.ownerUid) throw new Error("درخواست آرایشگری اطلاعات مالک ندارد.");
+  return linkVendorManager(vendor,vendor.ownerUid,true);
+}
+async function assignVendorManager(vendor,managerUid) {
+  return linkVendorManager(vendor,managerUid,false);
 }
 async function allUsers() {
   const s=await getDocs(collection(db,"users")); return s.docs.map(d=>({id:d.id,...d.data()}));
@@ -318,6 +334,7 @@ window.MoshtaryarCloud = {
   deleteBooking:id=>deleteDoc(doc(db,"bookings",id)),
   updateUserRole:(uid,role)=>updateDoc(doc(db,"users",uid),{role,updatedAt:serverTimestamp()}),
   approveVendorManager,
+  assignVendorManager,
   exists:async(c,id)=>(await getDoc(doc(db,c,id))).exists()
 };
 
@@ -350,7 +367,7 @@ function normalizeService(s){
  if(needsPrice && m && m[1].trim()) return {...s,name:m[1].trim(),price:m[2].trim()};
  return s;
 }
-vendors=vendors.map(v=>({...v,services:(v.services||[]).map(s=>({...normalizeService(s),durationMinutes:Number(s.durationMinutes)||30}))}));
+vendors=vendors.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
 if(!Array.isArray(bookings))bookings=[];
 let cloudReady=false;
 let currentUser=null;
@@ -432,7 +449,8 @@ function setAppAuthenticated(user){
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active', user ? p.id==='page-home' : p.id==='page-auth'));
   document.getElementById('accountBar').style.display=user?'flex':'none';
   if(user){
-    document.getElementById('accountInfo').textContent=(user.email||'حساب کاربری')+' — '+currentRole;
+    const roleLabel=currentRole==='super_admin'?'سوپرادمین':currentRole==='store_manager'?'آرایشگر':'مشتری';
+    document.getElementById('accountInfo').textContent=(user.email||'حساب کاربری')+' — '+roleLabel;
     document.getElementById('authMsg').textContent='';
   }
   document.querySelectorAll('.desktop-nav button,.mobile button').forEach(b=>b.disabled=!user);
@@ -529,27 +547,17 @@ function renderJCalendar(){const dates=findJMonth(calY,calM);document.getElement
 dateInput.addEventListener('click',()=>{calendarBox.classList.toggle('open');dateInput.setAttribute('aria-expanded',calendarBox.classList.contains('open')?'true':'false');if(calendarBox.classList.contains('open'))renderJCalendar()});
 document.getElementById('calPrev').addEventListener('click',()=>{calM--;if(calM<1){calM=12;calY--}renderJCalendar()});document.getElementById('calNext').addEventListener('click',()=>{calM++;if(calM>12){calM=1;calY++}renderJCalendar()});
 function parseServices(raw){return raw.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{
- const parts=line.split(/\s+-\s+/).map(x=>x.trim());
- if(parts.length>=3){const duration=Number(String(parts[parts.length-1]).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));if(Number.isFinite(duration)&&duration>0)return {name:parts.slice(0,-2).join(' - '),price:parts[parts.length-2]||'برای قیمت تماس بگیرید',durationMinutes:duration};}
  const m=line.match(/^(.*?)\s*(?:[-–—:]\s*)?((?:[۰-۹0-9][۰-۹0-9.,٬]*)\s*(?:(?:هزار|میلیون)\s*)?(?:تومان|تومن|ریال)|(?:[۰-۹0-9][۰-۹0-9.,٬]*)\s*(?:هزارتومان|هزارتومن))\s*$/);
- if(m && m[1].trim())return {name:m[1].trim(),price:m[2].trim(),durationMinutes:30};
+ if(m && m[1].trim())return {name:m[1].trim(),price:m[2].trim()};
  const i=line.indexOf('-');
- if(i>=0){const name=line.slice(0,i).trim(),price=line.slice(i+1).trim();return {name,price:price||'برای قیمت تماس بگیرید',durationMinutes:30}}
- return {name:line,price:'برای قیمت تماس بگیرید',durationMinutes:30}
+ if(i>=0){const name=line.slice(0,i).trim(),price=line.slice(i+1).trim();return {name,price:price||'برای قیمت تماس بگیرید'}}
+ return {name:line,price:'برای قیمت تماس بگیرید'}
 })}
-const scheduleDays=[['شنبه','sat'],['یکشنبه','sun'],['دوشنبه','mon'],['سه‌شنبه','tue'],['چهارشنبه','wed'],['پنجشنبه','thu'],['جمعه','fri']];
-function renderWeeklySchedule(schedule={}){
- const root=document.getElementById('weeklyScheduleEditor');if(!root)return;
- root.innerHTML=scheduleDays.map(([label,key])=>{const d=schedule[key]||{};return `<div class="schedule-row" data-day="${key}"><strong>${label}</strong><input aria-label="شروع ${label}" class="schedule-start" type="time" value="${esc(d.start||'')}"><input aria-label="پایان ${label}" class="schedule-end" type="time" value="${esc(d.end||'')}"><input aria-label="ظرفیت ${label}" class="schedule-capacity" type="number" min="1" max="100" value="${Number(d.capacity)||8}" placeholder="ظرفیت"><label class="closed"><input class="schedule-closed" type="checkbox" ${(d.closed!==false || !d.start || !d.end)?'checked':''}> تعطیل</label></div>`}).join('');
-}
-function readWeeklySchedule(){const out={};document.querySelectorAll('#weeklyScheduleEditor .schedule-row').forEach(row=>{const key=row.dataset.day;out[key]={start:row.querySelector('.schedule-start').value,end:row.querySelector('.schedule-end').value,capacity:Math.max(1,Number(row.querySelector('.schedule-capacity').value)||8),closed:row.querySelector('.schedule-closed').checked};});return out;}
-
 function resetVendorForm(){
   editingVendorId=null;
   document.getElementById('vendorForm').reset();
   document.getElementById('vendorFormTitle').textContent='ثبت فروشندهٔ جدید';
   document.getElementById('vendorFormMsg').textContent='';
-  renderWeeklySchedule({});
 }
 function editVendor(id){
   const v=vendors.find(x=>x.id===id);
@@ -564,8 +572,7 @@ function editVendor(id){
   document.getElementById('nvLat').value=v.lat??'';
   document.getElementById('nvLng').value=v.lng??'';
   document.getElementById('vendorLocationMsg').textContent=(v.lat!=null&&v.lng!=null)?'موقعیت این آرایشگاه ثبت شده است.':'موقعیت آرایشگاه هنوز ثبت نشده است.';
-  document.getElementById('nvServices').value=(v.services||[]).map(s=>`${s.name||''} - ${s.price||''} - ${Number(s.durationMinutes)||30}`).join('\n');
-  renderWeeklySchedule(v.schedule||{});
+  document.getElementById('nvServices').value=(v.services||[]).map(s=>`${s.name||''} - ${s.price||''}`).join('\n');
   document.getElementById('nvFaq').value=v.faq||'';
   document.getElementById('vendorFormMsg').textContent='اطلاعات را تغییر بده و روی «ذخیره فروشگاه» بزن.';
   showPage('new-vendor');
@@ -585,7 +592,6 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
     lat:document.getElementById('nvLat').value.trim()===''?null:Number(document.getElementById('nvLat').value),
     lng:document.getElementById('nvLng').value.trim()===''?null:Number(document.getElementById('nvLng').value),
     services:parseServices(document.getElementById('nvServices').value),
-    schedule:readWeeklySchedule(),
     faq:document.getElementById('nvFaq').value.trim()
   };
   let v;
@@ -609,7 +615,7 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
 });
 function populateSelects(){const selectable=vendors.filter(v=>v.status==='approved');const opts=selectable.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');const b=document.getElementById('bookVendor'),c=document.getElementById('chatVendor');const oldB=b.value,oldC=c.value;b.innerHTML=opts||'<option value="">فروشگاه تأییدشده‌ای موجود نیست</option>';c.innerHTML=opts||'<option value="">فروشگاه تأییدشده‌ای موجود نیست</option>';if(selectable.some(v=>v.id===oldB))b.value=oldB;else if(selectable.length)b.value=selectable[0].id;if(selectable.some(v=>v.id===oldC))c.value=oldC;else if(selectable.length)c.value=selectable[0].id}
 let latestBookingForShare=null;
-document.getElementById('bookingForm').addEventListener('submit',async e=>{e.preventDefault();if(!vendors.length){document.getElementById('bookingMsg').textContent='ابتدا یک فروشنده ثبت کن.';return}const v=vendors.find(x=>x.id===document.getElementById('bookVendor').value);const item={id:'b-'+Date.now(),customerUid:currentUser?.uid||null,vendorId:v?.id,vendorName:v?.name||'',vendorPhone:v?.phone||'',vendorRubika:v?.rubika||'',name:document.getElementById('bookName').value.trim(),phone:document.getElementById('bookPhone').value.trim(),service:document.getElementById('bookService').value.trim(),durationMinutes:Number((v?.services||[]).find(x=>x.name===document.getElementById('bookService').value.trim())?.durationMinutes)||30,date:document.getElementById('bookDate').value,time:document.getElementById('bookTime').value,note:document.getElementById('bookNote').value.trim(),status:'در انتظار تأیید'};if(bookings.some(b=>b.vendorId===item.vendorId&&b.date===item.date&&b.time===item.time)){document.getElementById('bookingMsg').textContent='⚠️ این نوبت قبلاً رزرو شده است. لطفاً تاریخ یا ساعت دیگری انتخاب کن.';return}bookings.push(item);await saveAll();latestBookingForShare=item;document.getElementById('shareBookingBtn').hidden=false;e.target.reset();populateSelects();document.getElementById('bookingMsg').textContent='✅ درخواست نوبت ثبت شد. برای فرستادن درخواست، دکمهٔ «ارسال درخواست از طریق روبیکا» را بزن و روبیکا را در فهرست اشتراک‌گذاری انتخاب کن. تا وقتی پیام را خودت نفرستی، فروشگاه باخبر نمی‌شود و نوبت تأیید نشده است.';renderHome()});
+document.getElementById('bookingForm').addEventListener('submit',async e=>{e.preventDefault();if(!vendors.length){document.getElementById('bookingMsg').textContent='ابتدا یک فروشنده ثبت کن.';return}const v=vendors.find(x=>x.id===document.getElementById('bookVendor').value);const item={id:'b-'+Date.now(),customerUid:currentUser?.uid||null,vendorId:v?.id,vendorName:v?.name||'',vendorPhone:v?.phone||'',vendorRubika:v?.rubika||'',name:document.getElementById('bookName').value.trim(),phone:document.getElementById('bookPhone').value.trim(),service:document.getElementById('bookService').value.trim(),date:document.getElementById('bookDate').value,time:document.getElementById('bookTime').value,note:document.getElementById('bookNote').value.trim(),status:'در انتظار تأیید'};if(bookings.some(b=>b.vendorId===item.vendorId&&b.date===item.date&&b.time===item.time)){document.getElementById('bookingMsg').textContent='⚠️ این نوبت قبلاً رزرو شده است. لطفاً تاریخ یا ساعت دیگری انتخاب کن.';return}bookings.push(item);await saveAll();latestBookingForShare=item;document.getElementById('shareBookingBtn').hidden=false;e.target.reset();populateSelects();document.getElementById('bookingMsg').textContent='✅ درخواست نوبت ثبت شد. برای فرستادن درخواست، دکمهٔ «ارسال درخواست از طریق روبیکا» را بزن و روبیکا را در فهرست اشتراک‌گذاری انتخاب کن. تا وقتی پیام را خودت نفرستی، فروشگاه باخبر نمی‌شود و نوبت تأیید نشده است.';renderHome()});
 async function shareLatestBooking(){if(!latestBookingForShare){document.getElementById('bookingMsg').textContent='ابتدا یک نوبت ثبت کن.';return}const b=latestBookingForShare;const message='درخواست نوبت از مشتریار\nفروشگاه: '+b.vendorName+'\nنام مشتری: '+b.name+'\nشماره تماس مشتری: '+b.phone+'\nخدمت: '+(b.service||'ذکر نشده')+'\nتاریخ: '+b.date+'\nساعت: '+b.time+'\nتوضیحات: '+(b.note||'ندارد')+'\n\nلطفاً امکان نوبت را تأیید کنید. این پیام درخواست است و نوبت تا زمان تأیید فروشگاه قطعی نیست.';try{if(navigator.share){await navigator.share({title:'درخواست نوبت مشتریار',text:message})}else if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(message);alert('متن درخواست کپی شد. روبیکا را باز کن و آن را برای صاحب فروشگاه بفرست.')}else{prompt('متن درخواست را کپی کن و در روبیکا بفرست:',message)}}catch(err){if(err&&err.name!=='AbortError'){prompt('اگر برگهٔ اشتراک‌گذاری باز نشد، متن را کپی کن و در روبیکا بفرست:',message)}}}
 function bookThis(id){populateSelects();document.getElementById('bookVendor').value=id;showPage('booking')}
 function chatAbout(id){populateSelects();document.getElementById('chatVendor').value=id;chatContextVendorId=id;assistantPendingClarification=null;showPage('chat');document.getElementById('chatInput').focus()}
@@ -629,9 +635,8 @@ function renderPanel(){
 async function setBookingStatus(id,status){
   const booking=bookings.find(b=>b.id===id);
   if(!booking)return;
-  const previous=booking.status;booking.status=status;
-  const ok=await saveAll();
-  if(!ok){booking.status=previous;return;}
+  booking.status=status;
+  saveAll();
   renderPanel();
   renderHome();
 }
@@ -820,7 +825,7 @@ function quickAsk(q){document.getElementById('chatInput').value=q;document.getEl
 document.getElementById('vendorSearch').addEventListener('search',renderVendors);
 const timeSelect=document.getElementById('bookTime');
 for(let mins=7*60;mins<=20*60;mins+=30){const hh=String(Math.floor(mins/60)).padStart(2,'0'),mm=String(mins%60).padStart(2,'0');const opt=document.createElement('option');opt.value=hh+':'+mm;opt.textContent=toFaDigits(hh)+':'+toFaDigits(mm);timeSelect.appendChild(opt)}
-renderWeeklySchedule({});renderHome();renderVendors();populateSelects();renderPanel();
+renderHome();renderVendors();populateSelects();renderPanel();
 </script>
 
 <script>
@@ -865,7 +870,7 @@ renderWeeklySchedule({});renderHome();renderVendors();populateSelects();renderPa
       const p=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
       currentRole=normalizeRole(p?.role);
       const vs=await window.MoshtaryarCloud.getVendors(currentRole);
-      vendors=vs.map(v=>({...v,services:(v.services||[]).map(s=>({...normalizeService(s),durationMinutes:Number(s.durationMinutes)||30}))}));
+      vendors=vs.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
       bookings=await window.MoshtaryarCloud.getBookings(currentRole,vendors);
       localSaveAll(); applyRoleUI(); renderHome(); renderVendors(); populateSelects(); renderPanel();
     }catch(e){console.error(e);document.getElementById('authMsg').textContent='ورود انجام شد، اما اطلاعات ابری خوانده نشد. Rules و تنظیمات Firebase را بررسی کن.';}
@@ -969,8 +974,8 @@ renderWeeklySchedule({});renderHome();renderVendors();populateSelects();renderPa
       const uid=overlay.querySelector('#assignManagerSelect').value;
       if(!ms.some(u=>u.uid===uid))return;
       try{
+        await window.MoshtaryarCloud.assignVendorManager(v,uid);
         v.managerUid=uid;
-        await window.MoshtaryarCloud.updateVendor(v);
         localSaveAll();
         close();
         renderPanel();
