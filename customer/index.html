@@ -241,11 +241,31 @@ async function updateVendor(v) {
   await setDoc(doc(db,"vendors",v.id), clean({...v,updatedAt:serverTimestamp()}), {merge:true});
 }
 async function saveBooking(b) {
-  await setDoc(doc(db,"bookings",b.id), clean({
-    ...b, customerUid:b.customerUid || auth.currentUser.uid,
-    status:b.status || "در انتظار تأیید",
-    createdAt:b.createdAt || serverTimestamp(), updatedAt:serverTimestamp()
-  }), {merge:true});
+  const user = auth?.currentUser;
+  const customerUid = user?.uid;
+  const vendorId = String(b?.vendorId || "").trim();
+  const bookingId = String(b?.id || "").trim();
+  if (!customerUid) throw new Error("حساب مشتری برای ثبت نوبت شناسایی نشد؛ دوباره وارد شو.");
+  if (!vendorId) throw new Error("شناسه فروشگاه خالی است؛ فروشگاه را دوباره انتخاب کن.");
+  if (!bookingId) throw new Error("شناسه نوبت ساخته نشده است؛ دوباره تلاش کن.");
+
+  const payload = clean({
+    ...b,
+    id: bookingId,
+    customerUid,
+    vendorId,
+    status: b.status || "در انتظار تأیید",
+    createdAt: b.createdAt || serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+  await setDoc(doc(db,"bookings",bookingId), payload, {merge:true});
+
+  // پس از نوشتن، دو شناسه اصلی را از سند ثبت‌شده کنترل می‌کنیم.
+  const saved = await getDoc(doc(db,"bookings",bookingId));
+  if (!saved.exists() || saved.data().customerUid !== customerUid || saved.data().vendorId !== vendorId) {
+    throw new Error("ثبت نوبت تأیید نشد؛ شناسه مشتری یا فروشگاه در سند ذخیره نشده است.");
+  }
+  return saved.data();
 }
 async function updateBooking(b) {
   await setDoc(doc(db,"bookings",b.id), clean({...b,updatedAt:serverTimestamp()}), {merge:true});
@@ -610,10 +630,10 @@ document.getElementById('bookingForm').addEventListener('submit',async e=>{
  msg.textContent='در حال ثبت نوبت در پایگاه داده مشترک...';
  try{
    // فقط رکورد همین نوبت در Firestore نوشته می‌شود؛ فروشگاه‌ها و نوبت‌های قبلی بازنویسی نمی‌شوند.
-   await window.MoshtaryarCloud.saveBooking(item);
-   bookings.push(item);
+   const savedBooking = await window.MoshtaryarCloud.saveBooking(item);
+   bookings.push({...item,...savedBooking});
    localSaveAll();
-   latestBookingForShare=item;
+   latestBookingForShare={...item,...savedBooking};
    document.getElementById('shareBookingBtn').hidden=false;
    e.target.reset();populateSelects();
    msg.textContent='✅ نوبت در پایگاه داده مشترک ثبت شد و برای تأیید فروشگاه در انتظار است.';
