@@ -1183,8 +1183,8 @@ function renderMyBookings(){
      const p=await window.MoshtaryarCloud.getUserProfile(ev.detail.uid);
      const r=normalizeRole(p?.role);
      if(r!=='customer'){
-       if(msg())msg().textContent='این حساب مشتری نیست. برای ورود به پنل مدیریت از نشانی نسخه مدیریت استفاده کن.';
-       await window.MoshtaryarCloud.signOut();
+       if(msg())msg().textContent='در حال انتقال به پنل مدیریت...';
+       window.location.href='../management/';
        return;
      }
      currentRole='customer';
