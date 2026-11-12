@@ -1128,6 +1128,13 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
     if(e.detail){
       currentUser=e.detail;cloudReady=!!window.MoshtaryarCloud.firebaseConfigured;
       try{currentRole=normalizeRole((await window.MoshtaryarCloud.getUserProfile(currentUser.uid))?.role);}catch(_){currentRole='customer';}
+      // آرایشگر و سوپرادمین نباید وارد محیط مشتری شوند.
+      if(currentRole==='store_manager' || currentRole==='super_admin'){
+        const msg=document.getElementById('authMsg');
+        if(msg) msg.textContent='حساب شناسایی شد؛ در حال انتقال به پنل مدیریت...';
+        window.location.replace('https://137175.github.io/moshtaryar-test/management/');
+        return;
+      }
       setAppAuthenticated(currentUser);await loadCloudData();
     }else{cloudReady=false;setAppAuthenticated(null);}
   });
@@ -1176,21 +1183,6 @@ function renderMyBookings(){
 }
 
 (function(){
- const msg=()=>document.getElementById('authMsg');
- window.addEventListener('moshtaryar-auth',async function(ev){
-   if(!ev.detail)return;
-   try{
-     const p=await window.MoshtaryarCloud.getUserProfile(ev.detail.uid);
-     const r=normalizeRole(p?.role);
-     if(r!=='customer'){
-       if(msg())msg().textContent='در حال انتقال به پنل مدیریت...';
-       window.location.href='../management/';
-       return;
-     }
-     currentRole='customer';
-     document.querySelectorAll('[data-page="panel"]').forEach(x=>x.remove());
-   }catch(e){console.error(e);}
- });
  const signup=document.getElementById('authSignup');if(signup)signup.textContent='ساخت حساب مشتری';
 })();
 </script>
