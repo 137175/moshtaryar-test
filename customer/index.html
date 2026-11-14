@@ -393,11 +393,11 @@ if(!Array.isArray(bookings))bookings=[];
 let cloudReady=false;
 let currentUser=null;
 function normalizeRole(value){
-  const r=String(value??'').trim().toLowerCase()
-    .replace(/[ي]/g,'ی').replace(/[ك]/g,'ک')
-    .replace(/[\s\-]+/g,'_');
-  if(['super_admin','superadmin','سوپر_مدیر','سوپر_ادمین','سوپرادمین','سوپرادمین','مدیر_کل','مدیرکل'].includes(r)) return 'super_admin';
-  if(['store_manager','storemanager','مدیر_فروشگاه','آرایشگر','ارایشگر'].includes(r)) return 'store_manager';
+  const raw=String(value??'').trim().toLowerCase()
+    .replace(/[ي]/g,'ی').replace(/[ك]/g,'ک');
+  const compact=raw.replace(/[\s_\-]+/g,'');
+  if(['superadmin','سوپرمدیر','سوپرادمین','مدیرکل'].includes(compact)) return 'super_admin';
+  if(['storemanager','مدیرفروشگاه','آرایشگر','ارایشگر'].includes(compact)) return 'store_manager';
   return 'customer';
 }
 let currentRole='customer';
@@ -481,13 +481,10 @@ function setAppAuthenticated(user){
 }
 async function refreshRole(){
   if(!currentUser) return;
-  try{
-    const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
-    currentRole=normalizeRole(profile?.role);
-  }catch(e){
-    console.error('Role lookup failed:',e);
-    throw e;
-  }
+  const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
+  if(!profile || !profile.role) throw new Error('نقش حساب در Firestore ثبت نشده است.');
+  currentRole=normalizeRole(profile.role);
+  return currentRole;
 }
 async function signOutUser(){
   if(window.MoshtaryarCloud.firebaseConfigured) await window.MoshtaryarCloud.signOut();
@@ -539,8 +536,12 @@ document.getElementById('authSignup').addEventListener('click',async()=>{
   if(!email||password.length<6){ msg.textContent='ایمیل و رمز حداقل ۶ کاراکتری وارد کن.'; return; }
   msg.textContent='در حال ساخت حساب...';
   try{
-    await window.MoshtaryarCloud.signUp(email,password);
-    msg.textContent='حساب ساخته شد؛ در حال دریافت اطلاعات...';
+    const cred=await window.MoshtaryarCloud.signUp(email,password);
+    currentUser=cred.user;
+    await refreshRole();
+    cloudReady=true;
+    setAppAuthenticated(currentUser);
+    await loadCloudData();
   }catch(err){ msg.textContent='ثبت‌نام ناموفق بود: '+(err.code||err.message); }
 });
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -1123,7 +1124,22 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
     if(user) applyRoleUI();
   };
 
-  // Authentication is handled once in the final role-routing listener below.
+  window.addEventListener('moshtaryar-auth',async e=>{
+    if(e.detail){
+      currentUser=e.detail;cloudReady=!!window.MoshtaryarCloud.firebaseConfigured;
+      try{
+        const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
+        if(!profile || !profile.role) throw new Error('سند نقش این حساب در users پیدا نشد یا فیلد role خالی است.');
+        currentRole=normalizeRole(profile.role);
+        setAppAuthenticated(currentUser);
+        await loadCloudData();
+      }catch(err){
+        console.error('Moshtaryar profile/cloud initialization:',err);
+        const msg=document.getElementById('authMsg');
+        if(msg) msg.textContent='ورود انجام شد، اما پروفایل یا اطلاعات ابری خوانده نشد: '+(err.code||err.message||'خطای نامشخص');
+      }
+    }else{cloudReady=false;currentRole='customer';setAppAuthenticated(null);}
+  });
 
   // Booking form saves only its new Firestore document in the primary submit handler.
 
@@ -1171,42 +1187,25 @@ function renderMyBookings(){
 (function(){
  const msg=()=>document.getElementById('authMsg');
  let routing=false;
- let handledUid=null;
  window.addEventListener('moshtaryar-auth',async function(ev){
-   const user=ev.detail;
-   if(!user){
-     handledUid=null;
-     currentUser=null;
-     currentRole='customer';
-     cloudReady=false;
-     setAppAuthenticated(null);
-     return;
-   }
-   if(routing || handledUid===user.uid)return;
-   handledUid=user.uid;
-   currentUser=user;
-   cloudReady=!!window.MoshtaryarCloud?.firebaseConfigured;
+   if(!ev.detail || routing)return;
    try{
-     if(!cloudReady)throw new Error('اتصال Firebase آماده نیست.');
-     const profile=await window.MoshtaryarCloud.getUserProfile(user.uid);
-     if(!profile || !profile.role)throw new Error('نقش این حساب در Firestore ثبت نشده است.');
-     currentRole=normalizeRole(profile.role);
-     if(currentRole==='store_manager'||currentRole==='super_admin'){
+     const p=await window.MoshtaryarCloud.getUserProfile(ev.detail.uid);
+     const r=normalizeRole(p?.role);
+     if(r==='store_manager'||r==='super_admin'){
        routing=true;
        if(msg())msg().textContent='حساب شناسایی شد؛ در حال انتقال به پنل مدیریت...';
-       window.location.replace('https://137175.github.io/moshtaryar-test/management/');
+       window.location.replace('../management/');
        return;
      }
-     setAppAuthenticated(user);
-     await window.loadCloudData();
+     currentRole='customer';
+     document.querySelectorAll('[data-page="panel"]').forEach(x=>x.remove());
    }catch(e){
-     console.error('Customer authentication/routing failed:',e);
-     cloudReady=false;
-     if(msg())msg().textContent='ورود انجام شد، اما نقش یا اطلاعات حساب دریافت نشد: '+(e.code||e.message||'خطای نامشخص');
+     console.error('Customer role routing failed:',e);
+     if(msg())msg().textContent='نقش حساب خوانده نشد: '+(e.code||e.message||'خطای نامشخص');
    }
  });
- const signup=document.getElementById('authSignup');
- if(signup)signup.textContent='ساخت حساب مشتری';
+ const signup=document.getElementById('authSignup');if(signup)signup.textContent='ساخت حساب مشتری';
 })();
 </script>
 
