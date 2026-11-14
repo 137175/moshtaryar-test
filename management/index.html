@@ -176,7 +176,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, getDocs, query, where, serverTimestamp, writeBatch
+  collection, getDocs, query, where, serverTimestamp, writeBatch, arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -272,6 +272,7 @@ async function approveVendorManager(vendor) {
   const batch = writeBatch(db);
   batch.set(doc(db,"users",vendor.ownerUid), {
     uid:vendor.ownerUid, role:"store_manager",
+    managedVendorIds:arrayUnion(vendor.id),
     updatedAt:serverTimestamp()
   }, {merge:true});
   batch.set(doc(db,"vendors",vendor.id), {
@@ -725,7 +726,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
     }).join(''):'<div class="empty">نوبتی پیدا نشد.</div>';
 
     const mine=vendors.filter(v=>admin||v.ownerUid===currentUser.uid||v.managerUid===currentUser.uid);
-    document.getElementById('manageVendors').innerHTML=mine.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="muted">وضعیت: ${esc(v.status||'pending')} | مدیر: ${esc(v.managerUid||'تخصیص‌نیافته')}</div><div class="btn-row"><button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">${v.managerApplication?'تأیید آرایشگر و فروشگاه':'تأیید'}</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button><button class="btn light" onclick="assignManagerPrompt('${esc(v.id)}')">تخصیص آرایشگر</button><button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button>`:''}</div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
+    document.getElementById('manageVendors').innerHTML=mine.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="muted">وضعیت: ${esc(v.status||'pending')} | مدیر: ${esc(v.managerUid||'تخصیص‌نیافته')}</div><div class="btn-row"><button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">${v.managerApplication?'تأیید آرایشگر و فروشگاه':'تأیید'}</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button>${!v.ownerUid?`<button class="btn light" onclick="assignManagerPrompt('${esc(v.id)}')">اتصال دستی آرایشگر</button>`:''}<button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button>`:''}</div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
     if(admin) await renderAdminUsers();
   };
 
@@ -739,7 +740,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
     if(currentRole!=='super_admin')return alert('فقط سوپرادمین می‌تواند وضعیت فروشگاه را تغییر دهد.');
     const v=vendors.find(x=>x.id===id);if(!v)return;
     try{
-      if(status==='approved' && v.managerApplication && v.ownerUid){
+      if(status==='approved' && v.ownerUid){
         await window.MoshtaryarCloud.approveVendorManager(v);
         v.status='approved';v.managerUid=v.ownerUid;v.managerApplication=false;
         alert('درخواست تأیید شد؛ نقش آرایشگر و دسترسی فروشگاه به‌صورت خودکار فعال شد.');
