@@ -1124,21 +1124,32 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
     if(user) applyRoleUI();
   };
 
+  let authEventVersion=0;
   window.addEventListener('moshtaryar-auth',async e=>{
-    if(e.detail){
-      currentUser=e.detail;cloudReady=!!window.MoshtaryarCloud.firebaseConfigured;
-      try{
-        const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
-        if(!profile || !profile.role) throw new Error('سند نقش این حساب در users پیدا نشد یا فیلد role خالی است.');
-        currentRole=normalizeRole(profile.role);
-        setAppAuthenticated(currentUser);
-        await loadCloudData();
-      }catch(err){
-        console.error('Moshtaryar profile/cloud initialization:',err);
-        const msg=document.getElementById('authMsg');
-        if(msg) msg.textContent='ورود انجام شد، اما پروفایل یا اطلاعات ابری خوانده نشد: '+(err.code||err.message||'خطای نامشخص');
-      }
-    }else{cloudReady=false;currentRole='customer';setAppAuthenticated(null);}
+    const version=++authEventVersion;
+    if(!e.detail){
+      cloudReady=false;
+      currentRole='customer';
+      setAppAuthenticated(null);
+      return;
+    }
+    const user=e.detail;
+    currentUser=user;
+    cloudReady=!!window.MoshtaryarCloud.firebaseConfigured;
+    try{
+      const profile=await window.MoshtaryarCloud.getUserProfile(user.uid);
+      // Ignore an older, slower auth callback if the user has already changed or signed out.
+      if(version!==authEventVersion || window.MoshtaryarCloud.currentUser?.uid!==user.uid) return;
+      if(!profile || !profile.role) throw new Error('سند نقش این حساب در users پیدا نشد یا فیلد role خالی است.');
+      currentRole=normalizeRole(profile.role);
+      setAppAuthenticated(user);
+      await loadCloudData();
+    }catch(err){
+      if(version!==authEventVersion) return;
+      console.error('Moshtaryar profile/cloud initialization:',err);
+      const msg=document.getElementById('authMsg');
+      if(msg) msg.textContent='ورود انجام شد، اما پروفایل یا اطلاعات ابری خوانده نشد: '+(err.code||err.message||'خطای نامشخص');
+    }
   });
 
   // Booking form saves only its new Firestore document in the primary submit handler.
@@ -1185,27 +1196,10 @@ function renderMyBookings(){
 }
 
 (function(){
- const msg=()=>document.getElementById('authMsg');
- let routing=false;
- window.addEventListener('moshtaryar-auth',async function(ev){
-   if(!ev.detail || routing)return;
-   try{
-     const p=await window.MoshtaryarCloud.getUserProfile(ev.detail.uid);
-     const r=normalizeRole(p?.role);
-     if(r==='store_manager'||r==='super_admin'){
-       routing=true;
-       if(msg())msg().textContent='حساب شناسایی شد؛ در حال انتقال به پنل مدیریت...';
-       window.location.replace('../management/');
-       return;
-     }
-     currentRole='customer';
-     document.querySelectorAll('[data-page="panel"]').forEach(x=>x.remove());
-   }catch(e){
-     console.error('Customer role routing failed:',e);
-     if(msg())msg().textContent='نقش حساب خوانده نشد: '+(e.code||e.message||'خطای نامشخص');
-   }
- });
- const signup=document.getElementById('authSignup');if(signup)signup.textContent='ساخت حساب مشتری';
+ const signup=document.getElementById('authSignup');
+ if(signup) signup.textContent='ساخت حساب مشتری';
+ // Keep this URL on the customer site for every role.
+ // Managers and super-admins use the explicit dashboard link when they need the management panel.
 })();
 </script>
 
