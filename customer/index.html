@@ -439,7 +439,7 @@ async function loadCloudData(){
     renderHome(); renderVendors(); populateSelects(); renderPanel();
   }catch(e){
     console.error(e);
-    document.getElementById('authMsg').textContent='ورود انجام شد، اما خواندن داده‌های ابری ممکن نشد. قوانین Firestore و تنظیمات پروژه را بررسی کنید.';
+    document.getElementById('authMsg').textContent='خطای دریافت اطلاعات ابری: '+(e.code||e.message||'خطای نامشخص');
   }
 }
 
@@ -484,7 +484,10 @@ async function refreshRole(){
   try{
     const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
     currentRole=normalizeRole(profile?.role);
-  }catch(e){ currentRole='customer'; }
+  }catch(e){
+    console.error('Role lookup failed:',e);
+    throw e;
+  }
 }
 async function signOutUser(){
   if(window.MoshtaryarCloud.firebaseConfigured) await window.MoshtaryarCloud.signOut();
@@ -536,12 +539,8 @@ document.getElementById('authSignup').addEventListener('click',async()=>{
   if(!email||password.length<6){ msg.textContent='ایمیل و رمز حداقل ۶ کاراکتری وارد کن.'; return; }
   msg.textContent='در حال ساخت حساب...';
   try{
-    const cred=await window.MoshtaryarCloud.signUp(email,password);
-    currentUser=cred.user;
-    await refreshRole();
-    cloudReady=true;
-    setAppAuthenticated(currentUser);
-    await loadCloudData();
+    await window.MoshtaryarCloud.signUp(email,password);
+    msg.textContent='حساب ساخته شد؛ در حال دریافت اطلاعات...';
   }catch(err){ msg.textContent='ثبت‌نام ناموفق بود: '+(err.code||err.message); }
 });
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -976,7 +975,7 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
       vendors=vs.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
       bookings=await window.MoshtaryarCloud.getBookings(currentRole,vendors);
       localSaveAll(); applyRoleUI(); renderHome(); renderVendors(); populateSelects(); renderPanel();
-    }catch(e){console.error(e);document.getElementById('authMsg').textContent='ورود انجام شد، اما اطلاعات ابری خوانده نشد. Rules و تنظیمات Firebase را بررسی کن.';}
+    }catch(e){console.error(e);document.getElementById('authMsg').textContent='خطای دریافت اطلاعات ابری: '+(e.code||e.message||'خطای نامشخص');}
   };
 
   window.renderHome=function(){
@@ -1124,20 +1123,7 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
     if(user) applyRoleUI();
   };
 
-  window.addEventListener('moshtaryar-auth',async e=>{
-    if(e.detail){
-      currentUser=e.detail;cloudReady=!!window.MoshtaryarCloud.firebaseConfigured;
-      try{currentRole=normalizeRole((await window.MoshtaryarCloud.getUserProfile(currentUser.uid))?.role);}catch(_){currentRole='customer';}
-      // آرایشگر و سوپرادمین نباید وارد محیط مشتری شوند.
-      if(currentRole==='store_manager' || currentRole==='super_admin'){
-        const msg=document.getElementById('authMsg');
-        if(msg) msg.textContent='حساب شناسایی شد؛ در حال انتقال به پنل مدیریت...';
-        window.location.replace('https://137175.github.io/moshtaryar-test/management/');
-        return;
-      }
-      setAppAuthenticated(currentUser);await loadCloudData();
-    }else{cloudReady=false;setAppAuthenticated(null);}
-  });
+  // Authentication is handled once in the final role-routing listener below.
 
   // Booking form saves only its new Firestore document in the primary submit handler.
 
@@ -1183,7 +1169,44 @@ function renderMyBookings(){
 }
 
 (function(){
- const signup=document.getElementById('authSignup');if(signup)signup.textContent='ساخت حساب مشتری';
+ const msg=()=>document.getElementById('authMsg');
+ let routing=false;
+ let handledUid=null;
+ window.addEventListener('moshtaryar-auth',async function(ev){
+   const user=ev.detail;
+   if(!user){
+     handledUid=null;
+     currentUser=null;
+     currentRole='customer';
+     cloudReady=false;
+     setAppAuthenticated(null);
+     return;
+   }
+   if(routing || handledUid===user.uid)return;
+   handledUid=user.uid;
+   currentUser=user;
+   cloudReady=!!window.MoshtaryarCloud?.firebaseConfigured;
+   try{
+     if(!cloudReady)throw new Error('اتصال Firebase آماده نیست.');
+     const profile=await window.MoshtaryarCloud.getUserProfile(user.uid);
+     if(!profile || !profile.role)throw new Error('نقش این حساب در Firestore ثبت نشده است.');
+     currentRole=normalizeRole(profile.role);
+     if(currentRole==='store_manager'||currentRole==='super_admin'){
+       routing=true;
+       if(msg())msg().textContent='حساب شناسایی شد؛ در حال انتقال به پنل مدیریت...';
+       window.location.replace('https://137175.github.io/moshtaryar-test/management/');
+       return;
+     }
+     setAppAuthenticated(user);
+     await window.loadCloudData();
+   }catch(e){
+     console.error('Customer authentication/routing failed:',e);
+     cloudReady=false;
+     if(msg())msg().textContent='ورود انجام شد، اما نقش یا اطلاعات حساب دریافت نشد: '+(e.code||e.message||'خطای نامشخص');
+   }
+ });
+ const signup=document.getElementById('authSignup');
+ if(signup)signup.textContent='ساخت حساب مشتری';
 })();
 </script>
 
