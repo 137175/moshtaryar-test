@@ -43,10 +43,6 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 .status-approved{background:#d1f7df;color:#146c36}
 .status-rejected{background:#ffe0e0;color:#9b1c1c}
 
-
-.service-editor{display:grid;gap:10px;margin-top:8px}.service-edit-row{display:grid;grid-template-columns:1.3fr 1fr .75fr auto;gap:7px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:12px;background:#f8fafc}.service-edit-row label,.schedule-row label{font-size:11px;margin:0 0 4px}.service-edit-row input,.schedule-row input{padding:9px;font-size:13px}.remove-row{border:0;border-radius:9px;background:#fee2e2;color:#991b1b;padding:9px 11px;font-weight:bold}.schedule-editor{display:grid;gap:8px;margin-top:8px}.schedule-row{display:grid;grid-template-columns:70px 1fr 1fr .8fr;gap:7px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:12px;background:#f8fafc}.day-toggle{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:bold}.day-toggle input{width:auto}.schedule-row input:disabled{background:#e2e8f0;color:#94a3b8}.editor-help{font-size:11px;color:var(--muted);margin:4px 0 8px}
-@media(max-width:520px){.service-edit-row{grid-template-columns:1fr 1fr}.service-edit-row .service-name{grid-column:1/-1}.service-edit-row .remove-row{grid-column:1/-1}.schedule-row{grid-template-columns:65px 1fr 1fr}.schedule-row .capacity-cell{grid-column:2/-1}}
-
 </style>
 </head>
 <body>
@@ -112,10 +108,9 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
    <div class="full"><label for="nvName">نام فروشگاه یا کسب‌وکار *</label><input id="nvName" required maxlength="100" placeholder="مثلاً آرایشگاه بهار"></div>
    <div><label for="nvPhone">شماره تماس</label><input id="nvPhone" type="tel" placeholder="شماره تماس"></div>
    <div class="full"><label for="nvRubika">آیدی یا لینک روبیکای آرایشگاه (اختیاری)</label><input id="nvRubika" type="text" placeholder="آیدی یا لینک روبیکا"><small class="muted">فعلاً برای یادداشت و انتخاب دستی مقصد است؛ برنامه پیام را خودکار ارسال نمی‌کند.</small></div>
-   <div><label for="nvHours">ساعات کاری کلی (اطلاعات قبلی)</label><input id="nvHours" placeholder="مثلاً هر روز ۸ تا ۲۲"></div>
+   <div><label for="nvHours">ساعات کاری</label><input id="nvHours" placeholder="مثلاً ۹ تا ۱۸"></div>
    <div class="full"><label for="nvAddress">آدرس</label><input id="nvAddress" placeholder="شهر، خیابان، پلاک"></div><div class="full"><button class="btn secondary" type="button" onclick="captureVendorLocation()">📍 ثبت موقعیت فعلی آرایشگاه</button><div id="vendorLocationMsg" class="notice">صاحب آرایشگاه باید هنگام حضور در محل، این دکمه را بزند تا موقعیت فروشگاه ثبت شود.</div><input id="nvLat" type="hidden"><input id="nvLng" type="hidden"></div>
-   <div class="full"><label>خدمات و قیمت‌ها</label><p class="editor-help">برای هر خدمت، نام، قیمت و مدت انجام را جداگانه وارد کن.</p><div id="serviceEditor" class="service-editor"></div><button class="btn secondary" type="button" onclick="addServiceRow()">＋ افزودن خدمت</button></div>
-   <div class="full"><label>برنامه هفتگی و ظرفیت روزانه</label><p class="editor-help">روزهای فعال را روشن کن و ساعت شروع، پایان و حداکثر تعداد مشتری هم‌زمان را وارد کن. روز تعطیل را خاموش بگذار.</p><div id="scheduleEditor" class="schedule-editor"></div></div>
+   <div class="full"><label for="nvServices">خدمات و قیمت‌ها</label><textarea id="nvServices" placeholder="اصلاح مو - ۲۰۰ هزار تومان&#10;رنگ مو - از ۵۰۰ هزار تومان"></textarea></div>
    <div class="full"><label for="nvFaq">توضیحات یا پاسخ‌های متداول</label><textarea id="nvFaq" placeholder="مثلاً برای رزرو تماس بگیرید؛ پارکینگ داریم."></textarea></div>
   </div>
   <div class="btn-row"><button class="btn" type="submit">ذخیره فروشگاه</button><button class="btn light" type="button" onclick="resetVendorForm()">پاک‌کردن فرم</button></div>
@@ -377,11 +372,11 @@ if(!Array.isArray(bookings))bookings=[];
 let cloudReady=false;
 let currentUser=null;
 function normalizeRole(value){
-  const r=String(value??'').trim().toLowerCase()
-    .replace(/[ي]/g,'ی').replace(/[ك]/g,'ک')
-    .replace(/[\s\-]+/g,'_');
-  if(['super_admin','superadmin','سوپر_مدیر','سوپر_ادمین','سوپرادمین','سوپرادمین','مدیر_کل','مدیرکل'].includes(r)) return 'super_admin';
-  if(['store_manager','storemanager','مدیر_فروشگاه','آرایشگر','ارایشگر'].includes(r)) return 'store_manager';
+  const raw=String(value??'').trim().toLowerCase()
+    .replace(/[ي]/g,'ی').replace(/[ك]/g,'ک');
+  const compact=raw.replace(/[\s_\-]+/g,'');
+  if(['superadmin','سوپرمدیر','سوپرادمین','مدیرکل'].includes(compact)) return 'super_admin';
+  if(['storemanager','مدیرفروشگاه','آرایشگر','ارایشگر'].includes(compact)) return 'store_manager';
   return 'customer';
 }
 let currentRole='customer';
@@ -423,7 +418,7 @@ async function loadCloudData(){
     renderHome(); renderVendors(); populateSelects(); renderPanel();
   }catch(e){
     console.error(e);
-    document.getElementById('authMsg').textContent='ورود انجام شد، اما خواندن داده‌های ابری ممکن نشد. قوانین Firestore و تنظیمات پروژه را بررسی کنید.';
+    document.getElementById('authMsg').textContent='خطای دریافت اطلاعات ابری: '+(e.code||e.message||'خطای نامشخص');
   }
 }
 
@@ -463,10 +458,10 @@ function setAppAuthenticated(user){
 }
 async function refreshRole(){
   if(!currentUser) return;
-  try{
-    const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
-    currentRole=normalizeRole(profile?.role);
-  }catch(e){ currentRole='customer'; }
+  const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
+  if(!profile || !profile.role) throw new Error('نقش حساب در Firestore ثبت نشده است.');
+  currentRole=normalizeRole(profile.role);
+  return currentRole;
 }
 async function signOutUser(){
   if(window.MoshtaryarCloud.firebaseConfigured) await window.MoshtaryarCloud.signOut();
@@ -551,39 +546,19 @@ function toFaDigits(s){return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[
 function renderJCalendar(){const dates=findJMonth(calY,calM);document.getElementById('calTitle').textContent=jMonths[calM-1]+' '+toFaDigits(calY);const grid=document.getElementById('calGrid');grid.innerHTML='';jWeek.forEach(w=>{const e=document.createElement('div');e.className='cal-week';e.textContent=w;grid.appendChild(e)});if(!dates.length){grid.innerHTML+='<div class="muted">تقویم در این دستگاه در دسترس نیست.</div>';return}const offset=(dates[0].getDay()+1)%7;for(let i=0;i<offset;i++){const blank=document.createElement('span');grid.appendChild(blank)}const today=new Date();today.setHours(0,0,0,0);dates.forEach(d=>{const jp=jalaliParts(d),b=document.createElement('button');b.type='button';b.className='cal-day';b.textContent=toFaDigits(jp.d);const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(d.getTime()===today.getTime())b.classList.add('today');if(dateInput.dataset.iso===iso)b.classList.add('selected');if(d<today)b.disabled=true;b.addEventListener('click',()=>{dateInput.value=[jp.y,jp.m,jp.d].map((n,i)=>i===0?String(n):String(n).padStart(2,'0')).join('/');dateInput.dataset.iso=iso;calendarBox.classList.remove('open');dateInput.setAttribute('aria-expanded','false');dateInput.dispatchEvent(new Event('change',{bubbles:true}))});grid.appendChild(b)})}
 dateInput.addEventListener('click',()=>{calendarBox.classList.toggle('open');dateInput.setAttribute('aria-expanded',calendarBox.classList.contains('open')?'true':'false');if(calendarBox.classList.contains('open'))renderJCalendar()});
 document.getElementById('calPrev').addEventListener('click',()=>{calM--;if(calM<1){calM=12;calY--}renderJCalendar()});document.getElementById('calNext').addEventListener('click',()=>{calM++;if(calM>12){calM=1;calY++}renderJCalendar()});
-const serviceEditor=document.getElementById('serviceEditor');
-const scheduleEditor=document.getElementById('scheduleEditor');
-const weekDays=[['sun','یکشنبه'],['mon','دوشنبه'],['tue','سه‌شنبه'],['wed','چهارشنبه'],['thu','پنجشنبه'],['fri','جمعه'],['sat','شنبه']];
-function addServiceRow(service={}){
- const row=document.createElement('div');row.className='service-edit-row';
- const fields=[['نام خدمت','name',service.name||'','مثلاً اصلاح مو','service-name'],['قیمت','price',service.price||'','مثلاً ۳۰۰ هزار تومان',''],['مدت (دقیقه)','duration',service.durationMinutes??service.duration??service.minutes??30,'مثلاً ۳۰','']];
- fields.forEach(([label,key,value,placeholder,cls])=>{const wrap=document.createElement('div');if(cls)wrap.className=cls;const l=document.createElement('label');l.textContent=label;const input=document.createElement('input');input.type=key==='duration'?'number':'text';input.dataset.field=key;input.value=value;input.placeholder=placeholder;if(key==='duration'){input.min='5';input.step='5'}wrap.append(l,input);row.append(wrap)});
- const del=document.createElement('button');del.type='button';del.className='remove-row';del.textContent='حذف خدمت';del.addEventListener('click',()=>row.remove());row.append(del);serviceEditor.append(row);
-}
-function readServiceRows(){return [...serviceEditor.querySelectorAll('.service-edit-row')].map(row=>{const get=k=>row.querySelector(`[data-field="${k}"]`)?.value.trim()||'';return {name:get('name'),price:get('price'),durationMinutes:Math.max(5,Number(get('duration'))||30)}}).filter(x=>x.name)}
-function renderScheduleRows(schedule={}){
- scheduleEditor.innerHTML='';scheduleEditor.dataset.configured=String(Object.keys(schedule||{}).length>0);
- weekDays.forEach(([key,label])=>{
-  const d=schedule[key]||schedule[{sun:'sunday',mon:'monday',tue:'tuesday',wed:'wednesday',thu:'thursday',fri:'friday',sat:'saturday'}[key]]||{};
-  const row=document.createElement('div');row.className='schedule-row';row.dataset.day=key;
-  const toggleWrap=document.createElement('label');toggleWrap.className='day-toggle';const toggle=document.createElement('input');toggle.type='checkbox';toggle.dataset.field='enabled';toggle.checked=!!(schedule[key]||schedule[{sun:'sunday',mon:'monday',tue:'tuesday',wed:'wednesday',thu:'thursday',fri:'friday',sat:'saturday'}[key]])&&!d.closed;const dayText=document.createElement('span');dayText.textContent=label;toggleWrap.append(toggle,dayText);row.append(toggleWrap);
-  [['شروع','start',d.start||''],['پایان','end',d.end||'']].forEach(([txt,k,val])=>{const wrap=document.createElement('div');const l=document.createElement('label');l.textContent=txt;const input=document.createElement('input');input.type='time';input.dataset.field=k;input.value=val;wrap.append(l,input);row.append(wrap)});
-  const capWrap=document.createElement('div');capWrap.className='capacity-cell';const capLabel=document.createElement('label');capLabel.textContent='ظرفیت روزانه';const cap=document.createElement('input');cap.type='number';cap.min='1';cap.max='100';cap.step='1';cap.dataset.field='capacity';cap.value=d.capacity||8;capWrap.append(capLabel,cap);row.append(capWrap);
-  const sync=()=>row.querySelectorAll('input:not([data-field="enabled"])').forEach(i=>i.disabled=!toggle.checked);toggle.addEventListener('change',()=>{scheduleEditor.dataset.configured='true';sync()});sync();scheduleEditor.append(row);
- });
-}
-function readWeeklySchedule(){if(scheduleEditor.dataset.configured!=='true')return null;const out={};[...scheduleEditor.querySelectorAll('.schedule-row')].forEach(row=>{const get=k=>row.querySelector(`[data-field="${k}"]`);const enabled=get('enabled').checked;const start=get('start').value,end=get('end').value,capacity=Math.max(1,Math.min(100,Number(get('capacity').value)||8));if(enabled){out[row.dataset.day]={start,end,capacity,closed:false}}else out[row.dataset.day]={closed:true}});return out}
-function parseServices(raw){return raw.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{const i=line.indexOf('-');return i>=0?{name:line.slice(0,i).trim(),price:line.slice(i+1).trim(),durationMinutes:30}:{name:line,price:'برای قیمت تماس بگیرید',durationMinutes:30}})}
+function parseServices(raw){return raw.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{
+ const m=line.match(/^(.*?)\s*(?:[-–—:]\s*)?((?:[۰-۹0-9][۰-۹0-9.,٬]*)\s*(?:(?:هزار|میلیون)\s*)?(?:تومان|تومن|ریال)|(?:[۰-۹0-9][۰-۹0-9.,٬]*)\s*(?:هزارتومان|هزارتومن))\s*$/);
+ if(m && m[1].trim())return {name:m[1].trim(),price:m[2].trim()};
+ const i=line.indexOf('-');
+ if(i>=0){const name=line.slice(0,i).trim(),price=line.slice(i+1).trim();return {name,price:price||'برای قیمت تماس بگیرید'}}
+ return {name:line,price:'برای قیمت تماس بگیرید'}
+})}
 function resetVendorForm(){
   editingVendorId=null;
   document.getElementById('vendorForm').reset();
-  serviceEditor.innerHTML='';addServiceRow();renderScheduleRows();
   document.getElementById('vendorFormTitle').textContent='ثبت فروشندهٔ جدید';
   document.getElementById('vendorFormMsg').textContent='';
 }
-
-// آماده‌سازی فرم اولیهٔ خدمات و برنامه هفتگی
-serviceEditor.innerHTML='';addServiceRow();renderScheduleRows();
 function editVendor(id){
   const v=vendors.find(x=>x.id===id);
   if(!v){alert('فروشگاه موردنظر پیدا نشد.');return}
@@ -597,8 +572,7 @@ function editVendor(id){
   document.getElementById('nvLat').value=v.lat??'';
   document.getElementById('nvLng').value=v.lng??'';
   document.getElementById('vendorLocationMsg').textContent=(v.lat!=null&&v.lng!=null)?'موقعیت این آرایشگاه ثبت شده است.':'موقعیت آرایشگاه هنوز ثبت نشده است.';
-  serviceEditor.innerHTML='';(v.services||[]).forEach(s=>addServiceRow(s));if(!(v.services||[]).length)addServiceRow();
-  renderScheduleRows(v.weeklySchedule||v.schedule||v.weeklyHours||{});
+  document.getElementById('nvServices').value=(v.services||[]).map(s=>`${s.name||''} - ${s.price||''}`).join('\n');
   document.getElementById('nvFaq').value=v.faq||'';
   document.getElementById('vendorFormMsg').textContent='اطلاعات را تغییر بده و روی «ذخیره فروشگاه» بزن.';
   showPage('new-vendor');
@@ -609,12 +583,6 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
   const name=document.getElementById('nvName').value.trim();
   if(!name)return;
   const wasEditing=!!editingVendorId;
-  for(const row of scheduleEditor.querySelectorAll('.schedule-row')){
-    if(row.querySelector('[data-field="enabled"]').checked){
-      const start=row.querySelector('[data-field="start"]').value,end=row.querySelector('[data-field="end"]').value;
-      if(!start||!end||start>=end){document.getElementById('vendorFormMsg').textContent='برای روزهای فعال، ساعت شروع و پایان معتبر وارد کن.';return;}
-    }
-  }
   const data={
     name,
     phone:document.getElementById('nvPhone').value.trim(),
@@ -623,10 +591,9 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
     address:document.getElementById('nvAddress').value.trim(),
     lat:document.getElementById('nvLat').value.trim()===''?null:Number(document.getElementById('nvLat').value),
     lng:document.getElementById('nvLng').value.trim()===''?null:Number(document.getElementById('nvLng').value),
-    services:readServiceRows(),
+    services:parseServices(document.getElementById('nvServices').value),
     faq:document.getElementById('nvFaq').value.trim()
   };
-  const weeklySchedule=readWeeklySchedule();if(weeklySchedule)data.weeklySchedule=weeklySchedule;
   let v;
   if(editingVendorId){
     v=vendors.find(x=>x.id===editingVendorId);
@@ -906,7 +873,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
       vendors=vs.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
       bookings=await window.MoshtaryarCloud.getBookings(currentRole,vendors);
       localSaveAll(); applyRoleUI(); renderHome(); renderVendors(); populateSelects(); renderPanel();
-    }catch(e){console.error(e);document.getElementById('authMsg').textContent='ورود انجام شد، اما اطلاعات ابری خوانده نشد. Rules و تنظیمات Firebase را بررسی کن.';}
+    }catch(e){console.error(e);document.getElementById('authMsg').textContent='خطای دریافت اطلاعات ابری: '+(e.code||e.message||'خطای نامشخص');}
   };
 
   window.renderHome=function(){
@@ -1057,9 +1024,18 @@ renderHome();renderVendors();populateSelects();renderPanel();
   window.addEventListener('moshtaryar-auth',async e=>{
     if(e.detail){
       currentUser=e.detail;cloudReady=!!window.MoshtaryarCloud.firebaseConfigured;
-      try{currentRole=normalizeRole((await window.MoshtaryarCloud.getUserProfile(currentUser.uid))?.role);}catch(_){currentRole='customer';}
-      setAppAuthenticated(currentUser);await loadCloudData();
-    }else{cloudReady=false;setAppAuthenticated(null);}
+      try{
+        const profile=await window.MoshtaryarCloud.getUserProfile(currentUser.uid);
+        if(!profile || !profile.role) throw new Error('سند نقش این حساب در users پیدا نشد یا فیلد role خالی است.');
+        currentRole=normalizeRole(profile.role);
+        setAppAuthenticated(currentUser);
+        await loadCloudData();
+      }catch(err){
+        console.error('Moshtaryar profile/cloud initialization:',err);
+        const msg=document.getElementById('authMsg');
+        if(msg) msg.textContent='ورود انجام شد، اما پروفایل یا اطلاعات ابری خوانده نشد: '+(err.code||err.message||'خطای نامشخص');
+      }
+    }else{cloudReady=false;currentRole='customer';setAppAuthenticated(null);}
   });
 
   // Patch booking creation so every cloud booking belongs to the authenticated customer.
@@ -1118,21 +1094,30 @@ function renderMyBookings(){
 
 (function(){
  const msg=()=>document.getElementById('authMsg');
+ let routing=false;
  window.addEventListener('moshtaryar-auth',async function(ev){
-   if(!ev.detail)return;
+   if(!ev.detail || routing)return;
    try{
      const p=await window.MoshtaryarCloud.getUserProfile(ev.detail.uid);
      const r=normalizeRole(p?.role);
-     if(r!=='customer'){
-       if(msg())msg().textContent='این حساب مشتری نیست. برای ورود به پنل مدیریت از نشانی نسخه مدیریت استفاده کن.';
-       await window.MoshtaryarCloud.signOut();
+     if(r==='customer'){
+       routing=true;
+       if(msg())msg().textContent='حساب مشتری شناسایی شد؛ در حال انتقال به صفحه مشتری...';
+       window.location.replace('../customer/');
        return;
      }
-     currentRole='customer';
-     document.querySelectorAll('[data-page="panel"]').forEach(x=>x.remove());
-   }catch(e){console.error(e);}
+     if(r!=='super_admin'&&r!=='store_manager'){
+       if(msg())msg().textContent='نقش این حساب برای ورود به پنل مدیریت مجاز نیست.';
+       return;
+     }
+     currentRole=r;
+     if(typeof applyRoleUI==='function')applyRoleUI();
+   }catch(e){
+     console.error('Management role routing failed:',e);
+     if(msg())msg().textContent='نقش حساب خوانده نشد: '+(e.code||e.message||'خطای نامشخص');
+   }
  });
- const signup=document.getElementById('authSignup');if(signup)signup.textContent='ساخت حساب مشتری';
+ const signup=document.getElementById('authSignup');if(signup)signup.remove();
 })();
 </script>
 
