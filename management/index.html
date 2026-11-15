@@ -176,7 +176,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, getDocs, query, where, serverTimestamp, writeBatch, arrayUnion
+  collection, getDocs, query, where, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -272,7 +272,6 @@ async function approveVendorManager(vendor) {
   const batch = writeBatch(db);
   batch.set(doc(db,"users",vendor.ownerUid), {
     uid:vendor.ownerUid, role:"store_manager",
-    managedVendorIds:arrayUnion(vendor.id),
     updatedAt:serverTimestamp()
   }, {merge:true});
   batch.set(doc(db,"vendors",vendor.id), {
@@ -684,8 +683,11 @@ renderHome();renderVendors();populateSelects();renderPanel();
     try{
       const vs=await window.MoshtaryarCloud.getVendors(currentRole);
       const bs=await window.MoshtaryarCloud.getBookings(currentRole,vs);
-      if(vs.length) vendors=vs.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
-      if(bs.length) bookings=bs;
+      // Always replace local state with the signed-in account's cloud data.
+      // Keeping old local bookings when the cloud query returns [] can leak
+      // another account's previously cached bookings into this manager panel.
+      vendors=vs.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
+      bookings=bs;
       localSaveAll(); applyRoleUI(); renderHome(); renderVendors(); populateSelects(); renderPanel();
     }catch(e){
       console.error('Moshtaryar management cloud load error:',e);
@@ -719,14 +721,16 @@ renderHome();renderVendors();populateSelects();renderPanel();
     const box=document.getElementById('panelBookingsList');
     if(currentRole==='customer'){box.innerHTML='<div class="empty">پنل مدیریت فقط برای آرایشگر و سوپرادمین است.</div>';return;}
     const admin=currentRole==='super_admin';
-    box.innerHTML=bookings.length?bookings.slice().reverse().map(b=>{
+    const managedVendorIds=new Set(vendors.filter(v=>v.ownerUid===currentUser?.uid||v.managerUid===currentUser?.uid).map(v=>v.id));
+    const visibleBookings=admin?bookings:bookings.filter(b=>managedVendorIds.has(b.vendorId));
+    box.innerHTML=visibleBookings.length?visibleBookings.slice().reverse().map(b=>{
       const s=b.status||'در انتظار تأیید', cls=s==='تأیید شده'?'status-approved':s==='رد شده'?'status-rejected':'status-pending';
       const actions=(!admin&&currentRole!=='store_manager')?'':(s==='در انتظار تأیید'?`<button class="btn" onclick="setBookingStatus('${esc(b.id)}','تأیید شده')">تأیید نوبت</button><button class="btn secondary" onclick="setBookingStatus('${esc(b.id)}','رد شده')">رد نوبت</button>`:admin?`<button class="btn secondary" onclick="setBookingStatus('${esc(b.id)}','در انتظار تأیید')">بازگرداندن</button>`:'');
       return `<article class="card" style="margin-bottom:10px"><h3>${esc(b.name)} — ${esc(b.vendorName)}</h3><div class="info">📅 ${esc(b.date)}، ${esc(b.time)}</div><div class="info">☎️ ${esc(b.phone)}</div><div class="info">خدمت: ${esc(b.service||'ذکر نشده')}</div><div class="booking-status ${cls}">وضعیت: ${esc(s)}</div><div class="btn-row">${actions}${admin?`<button class="btn danger" onclick="deleteBooking('${esc(b.id)}')">حذف</button>`:''}</div></article>`;
     }).join(''):'<div class="empty">نوبتی پیدا نشد.</div>';
 
     const mine=vendors.filter(v=>admin||v.ownerUid===currentUser.uid||v.managerUid===currentUser.uid);
-    document.getElementById('manageVendors').innerHTML=mine.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="muted">وضعیت: ${esc(v.status||'pending')} | مدیر: ${esc(v.managerUid||'تخصیص‌نیافته')}</div><div class="btn-row"><button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">${v.managerApplication?'تأیید آرایشگر و فروشگاه':'تأیید'}</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button>${!v.ownerUid?`<button class="btn light" onclick="assignManagerPrompt('${esc(v.id)}')">اتصال دستی آرایشگر</button>`:''}<button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button>`:''}</div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
+    document.getElementById('manageVendors').innerHTML=mine.map(v=>`<article class="card"><h3>${esc(v.name)}</h3><div class="muted">وضعیت: ${esc(v.status||'pending')} | مدیر: ${esc(v.managerUid||'تخصیص‌نیافته')}</div><div class="btn-row"><button class="btn light" onclick="editVendor('${esc(v.id)}')">ویرایش</button>${admin?`<button class="btn" onclick="setVendorStatus('${esc(v.id)}','approved')">${v.managerApplication?'تأیید آرایشگر و فروشگاه':'تأیید'}</button><button class="btn secondary" onclick="setVendorStatus('${esc(v.id)}','rejected')">رد</button><button class="btn light" onclick="assignManagerPrompt('${esc(v.id)}')">تخصیص آرایشگر</button><button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button>`:''}</div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
     if(admin) await renderAdminUsers();
   };
 
@@ -740,7 +744,7 @@ renderHome();renderVendors();populateSelects();renderPanel();
     if(currentRole!=='super_admin')return alert('فقط سوپرادمین می‌تواند وضعیت فروشگاه را تغییر دهد.');
     const v=vendors.find(x=>x.id===id);if(!v)return;
     try{
-      if(status==='approved' && v.ownerUid){
+      if(status==='approved' && v.managerApplication && v.ownerUid){
         await window.MoshtaryarCloud.approveVendorManager(v);
         v.status='approved';v.managerUid=v.ownerUid;v.managerApplication=false;
         alert('درخواست تأیید شد؛ نقش آرایشگر و دسترسی فروشگاه به‌صورت خودکار فعال شد.');
