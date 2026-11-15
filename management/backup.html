@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#173b63">
+<title>پشتیبان‌گیری مشتریار</title>
+<style>
+*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;background:#f3f6fa;color:#172334;margin:0;padding:18px;line-height:1.8}
+main{max-width:620px;margin:28px auto;background:#fff;border:1px solid #e1e7ef;border-radius:16px;padding:22px;box-shadow:0 8px 28px #18324a12}
+h1{font-size:22px;margin:0 0 8px}p{margin:8px 0 16px}.muted{color:#5d6b7c;font-size:14px}
+label{display:block;margin:12px 0 5px;font-size:14px}
+input{width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:9px;font-size:16px}
+button{width:100%;border:0;border-radius:9px;padding:13px;margin-top:14px;background:#175a91;color:white;font-size:16px;font-weight:bold}
+button:disabled{opacity:.55}
+#status{margin-top:16px;padding:12px;border-radius:9px;background:#f1f5f9;white-space:pre-wrap}
+.warning{background:#fff7e8;border:1px solid #f2d59b;padding:12px;border-radius:9px;font-size:13px}
+#counts{font-size:14px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<main>
+<h1>پشتیبان‌گیری مشتریار</h1>
+<p class="muted">این ابزار فقط اطلاعات را می‌خواند و یک فایل JSON روی گوشی یا رایانه ذخیره می‌کند. هیچ سندی را حذف یا ویرایش نمی‌کند.</p>
+<div class="warning">فقط با حساب سوپرادمین وارد شو. فایل پشتیبان شامل اطلاعات حساب‌ها، فروشگاه‌ها و رزروهاست؛ آن را برای دیگران نفرست.</div>
+<section id="loginBox">
+<label for="email">ایمیل سوپرادمین</label>
+<input id="email" type="email" autocomplete="username" placeholder="ایمیل">
+<label for="password">رمز عبور</label>
+<input id="password" type="password" autocomplete="current-password" placeholder="رمز عبور">
+<button id="loginBtn">ورود و تهیه پشتیبان</button>
+</section>
+<section id="resultBox" hidden>
+<div id="counts"></div>
+<button id="downloadBtn" disabled>دانلود فایل پشتیبان JSON</button>
+</section>
+<div id="status" role="status">آماده ورود.</div>
+</main>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDXAC5FYtJpFut62Q8fuk9aC9m2Sjt17h0",
+  authDomain: "moshtariar-test-2026.firebaseapp.com",
+  databaseURL: "https://moshtariar-test-2026-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "moshtariar-test-2026",
+  storageBucket: "moshtariar-test-2026.firebasestorage.app",
+  messagingSenderId: "154285472967",
+  appId: "1:154285472967:web:1851b147da3265411552e2",
+  measurementId: "G-XGP5J7PFXH"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+let backupData = null;
+
+function serialize(value) {
+  if (value && typeof value.toDate === "function" &&
+      typeof value.seconds === "number") {
+    return {__type:"firestore_timestamp", seconds:value.seconds, nanoseconds:value.nanoseconds || 0};
+  }
+  if (Array.isArray(value)) return value.map(serialize);
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [k,v] of Object.entries(value)) out[k] = serialize(v);
+    return out;
+  }
+  return value;
+}
+function show(message){ $("status").textContent = message; }
+$("loginBtn").addEventListener("click", async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
+  if (!email || !password) { show("ایمیل و رمز عبور را وارد کن."); return; }
+  $("loginBtn").disabled = true;
+  $("downloadBtn").disabled = true;
+  show("در حال ورود و بررسی دسترسی سوپرادمین...");
+  try {
+    const credential = await signInWithEmailAndPassword(auth,email,password);
+    const userSnap = await getDoc(doc(db,"users",credential.user.uid));
+    const role = String(userSnap.exists() ? userSnap.data().role || "" : "").trim().toLowerCase();
+    const allowed = ["super_admin","superadmin","سوپر_مدیر","سوپر مدیر","سوپرمدیر","سوپر_ادمین","سوپر ادمین","سوپرادمین","مدیر_کل","مدیر کل","مدیرکل"].includes(role);
+    if (!allowed) {
+      await signOut(auth);
+      throw new Error("این حساب در Firestore نقش سوپرادمین ندارد. هیچ اطلاعاتی دانلود نشد.");
+    }
+    show("دسترسی تأیید شد. در حال خواندن اطلاعات...");
+    const names = ["users","vendors","bookings"];
+    const data = {};
+    const counts = [];
+    for (const name of names) {
+      const snap = await getDocs(collection(db,name));
+      data[name] = snap.docs.map(d => ({id:d.id, ...serialize(d.data())}));
+      counts.push(name + ": " + snap.size + " سند");
+    }
+    backupData = {
+      app:"Moshtaryar",
+      projectId:"moshtariar-test-2026",
+      createdAt:new Date().toISOString(),
+      collections:data
+    };
+    $("counts").textContent = "پشتیبان آماده شد:\n" + counts.join("\n") + "\n\nفایل شامل هر سه مجموعه است.";
+    $("resultBox").hidden = false;
+    $("downloadBtn").disabled = false;
+    show("تهیه پشتیبان موفق بود. حالا روی دکمه دانلود بزن.");
+  } catch (err) {
+    console.error(err);
+    show("خطا: " + (err.code || err.message || "نامشخص") + "\nاگر دسترسی رد شد، قوانین Firestore یا اتصال اینترنت را بررسی می‌کنیم.");
+  } finally {
+    $("loginBtn").disabled = false;
+  }
+});
+$("downloadBtn").addEventListener("click", () => {
+  if (!backupData) return;
+  const blob = new Blob([JSON.stringify(backupData,null,2)],{type:"application/json;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "moshtaryar-backup-" + new Date().toISOString().slice(0,10) + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+  show("دانلود شروع شد. فایل JSON را در پوشه Downloads نگه دار و برای کسی ارسال نکن.");
+});
+</script>
+</body>
+</html>
