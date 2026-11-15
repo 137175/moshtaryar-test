@@ -651,8 +651,24 @@ document.getElementById('bookingForm').addEventListener('submit',async e=>{
  if(!item.name||!item.phone||!item.service||!item.date||!item.time){msg.textContent='لطفاً نام، شماره تماس، خدمت، تاریخ و ساعت را کامل انتخاب کن.';return;}
  const toMin=t=>{const a=String(t||'00:00').split(':').map(Number);return a[0]*60+(a[1]||0)};
  const startMin=toMin(item.time),endMin=startMin+item.durationMinutes;
- const overlap=bookings.some(b=>{if(b.vendorId!==item.vendorId||b.date!==item.date||b.status==='رد شده')return false;const bs=(v.services||[]).find(x=>x.name===b.service);const bsStart=toMin(b.time),bsEnd=bsStart+(Number(b.durationMinutes)||Number(bs?.durationMinutes)||30);return startMin<bsEnd&&endMin>bsStart});
+ const activeBookings=bookings.filter(b=>{
+   const status=String(b.status||'').trim().replace(/\u200c/g,' ');
+   return b.vendorId===item.vendorId&&b.date===item.date&&!['رد شده','لغو شده','لغو','لغو شده توسط مشتری','لغو شده توسط آرایشگر'].includes(status);
+ });
+ const overlap=activeBookings.some(b=>{const bs=(v.services||[]).find(x=>x.name===b.service);const bsStart=toMin(b.time),bsEnd=bsStart+(Number(b.durationMinutes)||Number(bs?.durationMinutes)||30);return startMin<bsEnd&&endMin>bsStart});
  if(overlap){msg.textContent='⚠️ این بازه با نوبت دیگری تداخل دارد؛ ساعت دیگری انتخاب کن.';refreshBookingTimes();return;}
+ const schedule=v.weeklySchedule||v.schedule||v.weeklyHours||{};
+ const dt=new Date(item.date+'T12:00:00'),shortDay=['sun','mon','tue','wed','thu','fri','sat'][dt.getDay()];
+ const longDay={sun:'sunday',mon:'monday',tue:'tuesday',wed:'wednesday',thu:'thursday',fri:'friday',sat:'saturday'}[shortDay];
+ const faDay={sun:'یکشنبه',mon:'دوشنبه',tue:'سه‌شنبه',wed:'چهارشنبه',thu:'پنجشنبه',fri:'جمعه',sat:'شنبه'}[shortDay];
+ const dayCfg=schedule[shortDay]||schedule[longDay]||schedule[faDay];
+ if(dayCfg){
+   const dayStart=toMin(dayCfg.start),dayEnd=toMin(dayCfg.end);
+   const breakStart=dayCfg.breakStart?toMin(dayCfg.breakStart):null,breakEnd=dayCfg.breakEnd?toMin(dayCfg.breakEnd):null;
+   if(dayCfg.closed||!dayCfg.start||!dayCfg.end||startMin<dayStart||endMin>dayEnd){msg.textContent='⚠️ این ساعت خارج از ساعت کاری آرایشگاه است.';refreshBookingTimes();return;}
+   if(breakStart!==null&&breakEnd!==null&&startMin<breakEnd&&endMin>breakStart){msg.textContent='⚠️ این ساعت با زمان استراحت آرایشگاه تداخل دارد.';refreshBookingTimes();return;}
+   if(activeBookings.length>=Math.max(1,Number(dayCfg.capacity)||8)){msg.textContent='⚠️ ظرفیت نوبت‌های این روز تکمیل شده است.';refreshBookingTimes();return;}
+ }
  if(btn)btn.disabled=true;
  msg.textContent='در حال ثبت نوبت در پایگاه داده مشترک...';
  try{
@@ -913,16 +929,31 @@ function selectedBookVendor(){return vendors.find(v=>v.id===document.getElementB
 function selectedBookService(){const v=selectedBookVendor();return (v?.services||[]).find(x=>x.name===document.getElementById('bookService').value)}
 function refreshBookingServices(){const v=selectedBookVendor(),sel=document.getElementById('bookService'),old=sel.value;sel.innerHTML='<option value="">انتخاب خدمت</option>'+(v?.services||[]).map(x=>`<option value="${esc(x.name)}">${esc(x.name)} — ${esc(x.price||'استعلام')} (${Number(x.durationMinutes)||30} دقیقه)</option>`).join('');if((v?.services||[]).some(x=>x.name===old))sel.value=old;refreshBookingTimes()}
 function refreshBookingTimes(){
- const v=selectedBookVendor(),svc=selectedBookService(),iso=document.getElementById('bookDate').dataset.iso,sel=timeSelect,old=sel.value;
- sel.innerHTML='<option value="">ابتدا خدمت و تاریخ را انتخاب کن</option>';
+ const v=selectedBookVendor(),svc=selectedBookService(),iso=dateInput.dataset.iso,sel=timeSelect,old=sel.value;
+ sel.innerHTML='<option value="">ابتدا فروشگاه، خدمت و تاریخ را انتخاب کن</option>';
  if(!v||!svc||!iso)return;
- const dt=new Date(iso+'T12:00:00'),day=['sun','mon','tue','wed','thu','fri','sat'][dt.getDay()],cfg=v.schedule?.[day];
- if(!cfg||cfg.closed||!cfg.start||!cfg.end){sel.innerHTML='<option value="">این روز تعطیل است یا ساعت کاری تنظیم نشده</option>';return;}
- const toMin=t=>{const a=String(t).split(':').map(Number);return a[0]*60+a[1]},start=toMin(cfg.start),end=toMin(cfg.end),dur=Number(svc.durationMinutes)||30,cap=Number(cfg.capacity)||8;
- const dayBookings=bookings.filter(b=>b.vendorId===v.id&&b.date===document.getElementById('bookDate').value&&b.status!=='رد شده');
+ // پنل مشترک جدید برنامه را در weeklySchedule ذخیره می‌کند؛ نسخه‌های قدیمی نیز پشتیبانی می‌شوند.
+ const schedule=v.weeklySchedule||v.schedule||v.weeklyHours||{};
+ const dt=new Date(iso+'T12:00:00'),shortDay=['sun','mon','tue','wed','thu','fri','sat'][dt.getDay()];
+ const longDay={sun:'sunday',mon:'monday',tue:'tuesday',wed:'wednesday',thu:'thursday',fri:'friday',sat:'saturday'}[shortDay];
+ const faDay={sun:'یکشنبه',mon:'دوشنبه',tue:'سه‌شنبه',wed:'چهارشنبه',thu:'پنجشنبه',fri:'جمعه',sat:'شنبه'}[shortDay];
+ let cfg=schedule[shortDay]||schedule[longDay]||schedule[faDay];
+ const toMin=t=>{const a=String(t||'').split(':').map(Number);return a[0]*60+(a[1]||0)};
+ // اگر فروشگاه فقط ساعت کلی ثبت کرده و برنامه هفتگی ندارد، برای همه روزها همان بازه را نشان بده؛ مدیر می‌تواند روزهای تعطیل را در برنامه هفتگی مشخص کند.
+ if(!cfg && !Object.keys(schedule).length && v.hours){
+   const hm=String(v.hours).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).match(/(\d{1,2})(?::(\d{2}))?\s*(?:تا|[-–])\s*(\d{1,2})(?::(\d{2}))?/);
+   if(hm)cfg={closed:false,start:String(Number(hm[1])).padStart(2,'0')+':'+(hm[2]||'00'),end:String(Number(hm[3])).padStart(2,'0')+':'+(hm[4]||'00'),capacity:8};
+ }
+ if(!cfg||cfg.closed||!cfg.start||!cfg.end){sel.innerHTML='<option value="">ساعت کاری این روز ثبت نشده یا تعطیل است</option>';return;}
+ const start=toMin(cfg.start),end=toMin(cfg.end),dur=Math.max(5,Number(svc.durationMinutes)||30),cap=Math.max(1,Number(cfg.capacity)||8);
+ const interval=Math.max(5,Math.min(60,Number(v.bookingIntervalMinutes)||15));
+ const breakStart=cfg.breakStart?toMin(cfg.breakStart):null,breakEnd=cfg.breakEnd?toMin(cfg.breakEnd):null;
+ if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end){sel.innerHTML='<option value="">ساعت کاری این روز درست ثبت نشده است</option>';return;}
+ const chosenDate=dateInput.value;
+ const dayBookings=bookings.filter(b=>b.vendorId===v.id&&b.date===chosenDate&&!['رد شده','لغو شده','لغو‌شده','لغو'].includes(String(b.status||'').trim()));
  if(dayBookings.length>=cap){sel.innerHTML='<option value="">ظرفیت این روز تکمیل شده است</option>';return;}
  const occupied=dayBookings.map(b=>{const st=toMin(b.time||'00:00'),bs=(v.services||[]).find(x=>x.name===b.service);return [st,st+(Number(b.durationMinutes)||Number(bs?.durationMinutes)||30)];});
- const options=[];for(let t=start;t+dur<=end;t+=15){if(!occupied.some(([a,z])=>t<z&&t+dur>a))options.push(t)}
+ const options=[];for(let t=start;t+dur<=end;t+=interval){const hitsBreak=breakStart!==null&&breakEnd!==null&&t<breakEnd&&t+dur>breakStart;if(!hitsBreak&&!occupied.some(([a,z])=>t<z&&t+dur>a))options.push(t)}
  if(!options.length){sel.innerHTML='<option value="">برای مدت این خدمت ساعت آزادی وجود ندارد</option>';return;}
  options.forEach(t=>{const hh=String(Math.floor(t/60)).padStart(2,'0'),mm=String(t%60).padStart(2,'0'),value=hh+':'+mm,opt=document.createElement('option');opt.value=value;opt.textContent=toFaDigits(value);sel.appendChild(opt)});
  if(options.some(t=>String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')===old))sel.value=old;
