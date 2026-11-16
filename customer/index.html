@@ -189,7 +189,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, getDocs, query, where, serverTimestamp, writeBatch
+  collection, getDocs, query, where, serverTimestamp, writeBatch, runTransaction
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -241,36 +241,91 @@ async function saveVendor(v) {
 async function updateVendor(v) {
   await setDoc(doc(db,"vendors",v.id), clean({...v,updatedAt:serverTimestamp()}), {merge:true});
 }
-async function saveBooking(b) {
+
+function bookingLockId(vendorId,date){
+  return encodeURIComponent(String(vendorId)+'__'+String(date)).replace(/\./g,'%2E');
+}
+function bookingMinutes(value){
+  const m=String(value||'').match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) throw new Error('فرمت ساعت نوبت معتبر نیست.');
+  const h=Number(m[1]), min=Number(m[2]);
+  if(h>23||min>59) throw new Error('ساعت نوبت معتبر نیست.');
+  return h*60+min;
+}
+function bookingIsActive(status){
+  const s=String(status||'در انتظار تأیید').trim().replace(/\u200c/g,' ');
+  return !['رد شده','لغو شده','لغو','لغو شده توسط مشتری','لغو شده توسط آرایشگر'].includes(s);
+}
+async function saveBooking(b, options={}) {
   const user = auth?.currentUser;
-  const customerUid = user?.uid;
-  const vendorId = String(b?.vendorId || "").trim();
-  const bookingId = String(b?.id || "").trim();
-  if (!customerUid) throw new Error("حساب مشتری برای ثبت نوبت شناسایی نشد؛ دوباره وارد شو.");
-  if (!vendorId) throw new Error("شناسه فروشگاه خالی است؛ فروشگاه را دوباره انتخاب کن.");
-  if (!bookingId) throw new Error("شناسه نوبت ساخته نشده است؛ دوباره تلاش کن.");
+  const vendorId = String(b?.vendorId || '').trim();
+  const bookingId = String(b?.id || '').trim();
+  const customerUid = String(b?.customerUid || user?.uid || '').trim();
+  if (!user) throw new Error('برای ثبت یا مدیریت نوبت ابتدا وارد حساب شو.');
+  if (!vendorId) throw new Error('شناسه فروشگاه خالی است.');
+  if (!bookingId) throw new Error('شناسه نوبت ساخته نشده است.');
+  if (!customerUid) throw new Error('شناسه مشتری نوبت مشخص نیست.');
+  if (!b?.date || !b?.time) throw new Error('تاریخ و ساعت نوبت کامل نیست.');
 
-  const payload = clean({
-    ...b,
-    id: bookingId,
-    customerUid,
-    vendorId,
-    status: b.status || "در انتظار تأیید",
-    createdAt: b.createdAt || serverTimestamp(),
-    updatedAt: serverTimestamp()
+  const bookingRef=doc(db,'bookings',bookingId);
+  const lockRef=doc(db,'bookingLocks',bookingLockId(vendorId,b.date));
+  const start=bookingMinutes(b.time);
+  const duration=Math.max(1,Number(b.durationMinutes)||30);
+  const end=start+duration;
+  const requestedStatus=b.status||'در انتظار تأیید';
+
+  return await runTransaction(db,async tx=>{
+    const bookingSnap=await tx.get(bookingRef);
+    const existing=bookingSnap.exists()?bookingSnap.data():null;
+    if(!existing && customerUid!==user.uid) throw new Error('مشتری نوبت با حساب واردشده مطابقت ندارد.');
+    if(existing && existing.vendorId!==vendorId) throw new Error('تغییر فروشگاه نوبت از این مسیر مجاز نیست.');
+    if(existing && existing.date!==b.date) throw new Error('تغییر تاریخ نوبت از این مسیر مجاز نیست.');
+
+    const lockSnap=await tx.get(lockRef);
+    const lockData=lockSnap.exists()?lockSnap.data():{};
+    let entries=Array.isArray(lockData.entries)?lockData.entries.slice():[];
+    const oldEntry=entries.find(x=>x && x.bookingId===bookingId);
+    const wasAlreadyLocked=!!oldEntry;
+    entries=entries.filter(x=>x && x.bookingId!==bookingId);
+
+    const finalStatus=existing && b.status===undefined ? (existing.status||'در انتظار تأیید') : requestedStatus;
+    const finalStart=existing?bookingMinutes(existing.time||b.time):start;
+    const finalDuration=existing?Math.max(1,Number(existing.durationMinutes)||duration):duration;
+    const finalEnd=finalStart+finalDuration;
+    const finalActive=bookingIsActive(finalStatus);
+
+    if(finalActive){
+      if(!wasAlreadyLocked && !options.seedExisting){
+        const conflict=entries.some(x=>bookingIsActive(x.status) && start < Number(x.endMin) && end > Number(x.startMin));
+        if(conflict) throw new Error('این بازه زمانی با نوبت دیگری تداخل دارد. لطفاً ساعت دیگری انتخاب کن.');
+      }
+      entries.push({bookingId,startMin:existing?finalStart:start,endMin:existing?finalEnd:end,status:finalStatus});
+    }
+
+    // رزروهای قبلی فقط برای ساخت قفل زمان وارد می‌شوند؛ سند اصلی آن‌ها بازنویسی نمی‌شود.
+    if(!existing){
+      const payload=clean({...b,id:bookingId,customerUid,vendorId,status:requestedStatus,
+        createdAt:b.createdAt||serverTimestamp(),updatedAt:serverTimestamp()});
+      tx.set(bookingRef,payload);
+    } else if(b.status!==undefined && b.status!==(existing.status||'در انتظار تأیید')) {
+      tx.update(bookingRef,{status:b.status,updatedAt:serverTimestamp()});
+    }
+
+    tx.set(lockRef,{vendorId,date:b.date,entries,updatedAt:serverTimestamp()},{merge:true});
+    return {...(existing||b),...b,id:bookingId,customerUid,vendorId,status:finalStatus};
   });
-  await setDoc(doc(db,"bookings",bookingId), payload, {merge:true});
-
-  // پس از نوشتن، دو شناسه اصلی را از سند ثبت‌شده کنترل می‌کنیم.
-  const saved = await getDoc(doc(db,"bookings",bookingId));
-  if (!saved.exists() || saved.data().customerUid !== customerUid || saved.data().vendorId !== vendorId) {
-    throw new Error("ثبت نوبت تأیید نشد؛ شناسه مشتری یا فروشگاه در سند ذخیره نشده است.");
+}
+async function syncBookingLocks(list=[]){
+  for(const booking of list){
+    if(booking?.id && booking?.vendorId && booking?.date && booking?.time){
+      await saveBooking(booking,{seedExisting:true});
+    }
   }
-  return saved.data();
 }
 async function updateBooking(b) {
-  await setDoc(doc(db,"bookings",b.id), clean({...b,updatedAt:serverTimestamp()}), {merge:true});
+  return saveBooking(b);
 }
+
 async function getVendors(role) {
   let s;
   if (role === "super_admin") s = await getDocs(collection(db,"vendors"));
@@ -351,8 +406,22 @@ window.MoshtaryarCloud = {
   getAllUsers:allUsers,
   saveVendor, updateVendor,
   deleteVendor:id=>deleteDoc(doc(db,"vendors",id)),
-  saveBooking, updateBooking,
-  deleteBooking:id=>deleteDoc(doc(db,"bookings",id)),
+  saveBooking, updateBooking, syncBookingLocks,
+  deleteBooking:async id=>{
+    const bookingRef=doc(db,"bookings",id);
+    return runTransaction(db,async tx=>{
+      const bookingSnap=await tx.get(bookingRef);
+      if(!bookingSnap.exists()) return false;
+      const booking=bookingSnap.data();
+      const lockRef=doc(db,"bookingLocks",bookingLockId(booking.vendorId,booking.date));
+      const lockSnap=await tx.get(lockRef);
+      const entries=lockSnap.exists()&&Array.isArray(lockSnap.data().entries)
+        ? lockSnap.data().entries.filter(x=>x&&x.bookingId!==id) : [];
+      if(lockSnap.exists()) tx.set(lockRef,{vendorId:booking.vendorId,date:booking.date,entries,updatedAt:serverTimestamp()},{merge:true});
+      tx.delete(bookingRef);
+      return true;
+    });
+  },
   updateUserRole:(uid,role)=>updateDoc(doc(db,"users",uid),{role,updatedAt:serverTimestamp()}),
   approveVendorManager,
   assignVendorManager,
@@ -433,6 +502,8 @@ async function loadCloudData(){
     // Load vendors first: booking queries for managers depend on their vendor IDs.
     const cv = await window.MoshtaryarCloud.getVendors(currentRole);
     const cb = await window.MoshtaryarCloud.getBookings(currentRole, cv);
+    // فقط مدیر فروشگاه و سوپرادمین به فهرست کامل نوبت‌های فروشگاه دسترسی دارند؛ قفل‌های اولیه را از همین داده‌ها می‌سازند.
+    if(currentRole!=='customer') await window.MoshtaryarCloud.syncBookingLocks(cb);
     if(cv.length) vendors=cv.map(v=>({...v,services:(v.services||[]).map(normalizeService)}));
     if(cb.length) bookings=cb;
     localSaveAll();
@@ -698,7 +769,7 @@ function renderPanel(){
     const actions=status==='در انتظار تأیید'
       ? `<button class="btn" onclick="setBookingStatus('${esc(b.id)}','تأیید شده')">تأیید نوبت</button><button class="btn secondary" onclick="setBookingStatus('${esc(b.id)}','رد شده')">رد نوبت</button>`
       : `<button class="btn secondary" onclick="setBookingStatus('${esc(b.id)}','در انتظار تأیید')">بازگرداندن به انتظار</button>`;
-    return `<article class="card" style="margin-bottom:10px"><div class="booking-item"><div><h3>${esc(b.name)} — ${esc(b.vendorName)}</h3><div class="info">📅 ${esc(b.date)}، ${esc(b.time)}</div><div class="info">☎️ ${esc(b.phone)}</div><div class="info">خدمت: ${esc(b.service||'ذکر نشده')}</div><div class="info booking-status ${statusClass}">وضعیت: ${esc(status)}</div><div class="muted">${esc(b.note||'')}</div><div class="btn-row" style="margin-top:10px">${actions}</div></div><button class="btn danger" onclick="deleteBooking('${esc(b.id)}')">حذف</button></div></article>`;
+    return `<article class="card" style="margin-bottom:10px"><div class="booking-item"><div><h3>${esc(b.name)} — ${esc(b.vendorName)}</h3><div class="info">📅 ${esc(b.date)}، ${esc(b.time)}</div><div class="info">☎️ ${esc(b.phone)}</div><div class="info">خدمت: ${esc(b.service||'ذکر نشده')}</div><div class="info booking-status ${statusClass}">وضعیت: ${esc(status)}</div><div class="muted">${esc(b.note||'')}</div><div class="btn-row" style="margin-top:10px">${actions}</div></div>${currentRole==='super_admin'?`<button class="btn danger" onclick="deleteBooking('${esc(b.id)}')">حذف</button>`:''}</div></article>`;
   }).join(''):'<div class="empty">هنوز نوبتی ثبت نشده است.</div>';
   document.getElementById('manageVendors').innerHTML=vendors.map(v=>`<article class="card"><div class="vendor-item"><div><h3>${esc(v.name)}</h3><div class="muted">${esc(v.phone||'شماره ثبت نشده')}</div></div><div class="btn-row"><button class="btn secondary" onclick="editVendor('${esc(v.id)}')">ویرایش</button><button class="btn danger" onclick="deleteVendor('${esc(v.id)}')">حذف</button></div></div></article>`).join('')||'<div class="empty">فروشگاهی نیست.</div>';
   document.getElementById('statBookings').textContent=bookings.length;
@@ -725,8 +796,18 @@ function closeDeleteConfirm(){
 }
 document.getElementById('confirmDeleteYes').addEventListener('click',async ()=>{
   if(!pendingBookingDeleteId)return;
-  bookings=bookings.filter(b=>b.id!==pendingBookingDeleteId);
-  await saveAll();closeDeleteConfirm();renderPanel();renderHome();
+  const id=pendingBookingDeleteId;
+  try{
+    if(cloudReady && window.MoshtaryarCloud.currentUser){
+      if(currentRole!=='super_admin') throw new Error('حذف نوبت فقط برای سوپرادمین مجاز است.');
+      await window.MoshtaryarCloud.deleteBooking(id);
+    }
+    bookings=bookings.filter(b=>b.id!==id);
+    localSaveAll();closeDeleteConfirm();renderPanel();renderHome();
+  }catch(e){
+    console.error('Booking deletion failed:',e);
+    alert('حذف نوبت انجام نشد؛ اطلاعات قبلی حفظ شد. '+(e.code||e.message||''));
+  }
 });
 document.getElementById('confirmDeleteNo').addEventListener('click',closeDeleteConfirm);
 document.getElementById('confirmDeleteModal').addEventListener('click',e=>{
@@ -1050,7 +1131,14 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
   window.setBookingStatus=async function(id,status){
     if(currentRole==='customer')return alert('مشتری اجازه تغییر وضعیت نوبت را ندارد.');
     const b=bookings.find(x=>x.id===id);if(!b)return;
-    b.status=status;await window.MoshtaryarCloud.updateBooking(b);localSaveAll();renderPanel();renderHome();
+    const updated={...b,status};
+    try{
+      await window.MoshtaryarCloud.updateBooking(updated);
+      Object.assign(b,updated);localSaveAll();renderPanel();renderHome();
+    }catch(e){
+      console.error('Booking status update failed:',e);
+      alert('تغییر وضعیت ذخیره نشد؛ اطلاعات قبلی حفظ شد. '+(e.code||e.message||''));
+    }
   };
 
   window.setVendorStatus=async function(id,status){
