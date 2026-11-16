@@ -530,22 +530,44 @@ function parseServices(raw){return raw.split('\n').map(line=>line.trim()).filter
  return {name:name.trim(),price:price.trim(),durationMinutes};
 })}
 function parseWeeklySchedule(raw){
- const names=[
-  ['شنبه','sat'],['یکشنبه','sun'],['دوشنبه','mon'],
-  ['سه شنبه','tue'],['چهارشنبه','wed'],['پنجشنبه','thu'],['جمعه','fri']
+ const dayDefs=[
+  {re:/^شنبه(?=$|[\s:：\-–—])/u,key:'sat'},
+  {re:/^یکشنبه(?=$|[\s:：\-–—])/u,key:'sun'},
+  {re:/^دوشنبه(?=$|[\s:：\-–—])/u,key:'mon'},
+  {re:/^سه\s*شنبه(?=$|[\s:：\-–—])/u,key:'tue'},
+  {re:/^چهارشنبه(?=$|[\s:：\-–—])/u,key:'wed'},
+  {re:/^پنجشنبه(?=$|[\s:：\-–—])/u,key:'thu'},
+  {re:/^جمعه(?=$|[\s:：\-–—])/u,key:'fri'}
  ];
- const normalizeDay=s=>String(s||'').replace(/[\u200c\u200f\u202a-\u202e]/g,' ').replace(/\s+/g,' ').trim();
+ const normalize=s=>String(s||'').replace(/[\u200c\u200f\u202a-\u202e]/g,' ').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/\s+/g,' ').trim();
+ const ascii=s=>digitsToAscii(s).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d));
  const out={};
- raw.split('\n').map(x=>x.trim()).filter(Boolean).forEach(line=>{
-  const normalized=normalizeDay(line);
-  // نام روز باید ابتدای خط و به‌صورت کامل باشد؛ «شنبه» نباید از «یکشنبه» یا «دوشنبه» تشخیص داده شود.
-  const day=names.find(([n])=>normalized===n || normalized.startsWith(n+' -') || normalized.startsWith(n+' '));
+ const parseTime=(rawTime)=>{
+  const t=ascii(rawTime).trim();
+  const m=t.match(/(\d{1,2})(?::(\d{1,2}))?\s*(صبح|بعدازظهر|عصر|شب)?/u);
+  if(!m)return null;
+  let h=Number(m[1]),min=Number(m[2]||0),period=m[3]||'';
+  if(min>59||h>24||h<0)return null;
+  if(period==='شب'&&h<12)h+=12;
+  else if((period==='بعدازظهر'||period==='عصر')&&h<12)h+=12;
+  else if(period==='صبح'&&h===12)h=0;
+  if(h>23)return null;
+  return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
+ };
+ String(raw||'').split(/\r?\n/).forEach(line=>{
+  const normalized=normalize(line);
+  if(!normalized)return;
+  const day=dayDefs.find(d=>d.re.test(normalized));
   if(!day)return;
-  const key=day[1];
-  if(line.includes('تعطیل')){out[key]={closed:true};return;}
-  const m=digitsToAscii(line).match(/(\d{1,2}:\d{2})\s*(?:تا|[-–])\s*(\d{1,2}:\d{2})/);
-  const c=digitsToAscii(line).match(/ظرفیت\s*(\d+)/);
-  if(m){out[key]={closed:false,start:m[1].padStart(5,'0'),end:m[2].padStart(5,'0'),capacity:c?Math.max(1,Math.min(100,Number(c[1]))):8};}
+  const key=day.key;
+  if(/تعطیل|بسته/u.test(normalized)){out[key]={closed:true};return;}
+  const rest=normalized.replace(day.re,'').replace(/^[\s:：\-–—]+/u,'');
+  const timeRange=rest.match(/(.+?)\s*(?:تا|الی|[-–—])\s*(.+?)(?=\s*(?:[-–—]|ظرفیت|استراحت)\s*|$)/u);
+  if(!timeRange)return;
+  const start=parseTime(timeRange[1]),end=parseTime(timeRange[2]);
+  if(!start||!end||start>=end)return;
+  const cap=ascii(rest).match(/ظرفیت\s*(\d+)/u);
+  out[key]={closed:false,start,end,capacity:cap?Math.max(1,Math.min(100,Number(cap[1]))):8};
  });
  return out;
 }
