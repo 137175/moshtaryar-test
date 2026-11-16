@@ -530,11 +530,18 @@ function parseServices(raw){return raw.split('\n').map(line=>line.trim()).filter
  return {name:name.trim(),price:price.trim(),durationMinutes};
 })}
 function parseWeeklySchedule(raw){
- const keys=['sat','sun','mon','tue','wed','thu','fri'];
- const names=[['شنبه','sat'],['یکشنبه','sun'],['دوشنبه','mon'],['سه‌شنبه','tue'],['سه شنبه','tue'],['چهارشنبه','wed'],['پنجشنبه','thu'],['جمعه','fri']];
+ const names=[
+  ['شنبه','sat'],['یکشنبه','sun'],['دوشنبه','mon'],
+  ['سه شنبه','tue'],['چهارشنبه','wed'],['پنجشنبه','thu'],['جمعه','fri']
+ ];
+ const normalizeDay=s=>String(s||'').replace(/[\u200c\u200f\u202a-\u202e]/g,' ').replace(/\s+/g,' ').trim();
  const out={};
  raw.split('\n').map(x=>x.trim()).filter(Boolean).forEach(line=>{
-  const day=names.find(([n])=>line.includes(n)); if(!day)return; const key=day[1];
+  const normalized=normalizeDay(line);
+  // نام روز باید ابتدای خط و به‌صورت کامل باشد؛ «شنبه» نباید از «یکشنبه» یا «دوشنبه» تشخیص داده شود.
+  const day=names.find(([n])=>normalized===n || normalized.startsWith(n+' -') || normalized.startsWith(n+' '));
+  if(!day)return;
+  const key=day[1];
   if(line.includes('تعطیل')){out[key]={closed:true};return;}
   const m=digitsToAscii(line).match(/(\d{1,2}:\d{2})\s*(?:تا|[-–])\s*(\d{1,2}:\d{2})/);
   const c=digitsToAscii(line).match(/ظرفیت\s*(\d+)/);
