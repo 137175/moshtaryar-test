@@ -23,7 +23,7 @@ await seed('vendors/'+ids[0],{ownerUid:app.uid,status:'pending',managerApplicati
 await seed('vendors/'+ids[1],{ownerUid:app.uid,status:'approved'});
 await seed('vendors/'+ids[2],{ownerUid:app.uid,status:'pending',managerApplication:true});
 await seed('vendors/'+ids[3],{ownerUid:app.uid,status:'approved'});
-await seed('vendors/'+ids[4],{ownerUid:free.uid,status:'approved'});
+
 for(const [n,d] of [['setVendorStatus',{vendorId:ids[0],status:'approved'}],['archiveVendor',{vendorId:ids[1]}],['assignVendorManager',{vendorId:ids[3],managerUid:m.uid}],['approveVendorManager',{vendorId:ids[2]}],['updateUserRole',{targetUid:free.uid,role:'store_manager'}]])await no(c,n,d);
 console.log('PASS: customer denied on all five admin callables.');
 await yes(a,'setVendorStatus',{vendorId:ids[0],status:'approved'});assert((await get('vendors/'+ids[0])).status==='approved','status update');
@@ -34,6 +34,7 @@ await seed('vendors/'+ids[5],{ownerUid:free.uid,status:'pending',managerApplicat
 await yes(a,'assignVendorManager',{vendorId:ids[3],managerUid:m.uid});v=await get('vendors/'+ids[3]);assert(v.managerUid===m.uid,'managerUid');assert((await get('users/'+m.uid)).storeId===ids[3],'manager storeId');
 await seed('vendors/'+ids[6],{ownerUid:app.uid,status:'approved'});await no(a,'assignVendorManager',{vendorId:ids[6],managerUid:free.uid});console.log('PASS: manager application and assignment constraints.');
 await yes(a,'updateUserRole',{targetUid:free.uid,role:'store_manager'});await yes(a,'updateUserRole',{targetUid:free.uid,role:'customer'});assert((await get('users/'+free.uid)).role==='customer','role changes');
+await seed('vendors/'+ids[4],{ownerUid:free.uid,status:'approved'});
 await no(a,'updateUserRole',{targetUid:free.uid,role:'customer'}); // freeUser still owns ids[4]
 await no(a,'updateUserRole',{targetUid:m.uid,role:'customer'}); // assigned manager
 await yes(a,'updateUserRole',{targetUid:a2.uid,role:'customer'});await no(a,'updateUserRole',{targetUid:a.uid,role:'customer'});
