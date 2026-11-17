@@ -30,7 +30,7 @@ await yes(a,'setVendorStatus',{vendorId:ids[0],status:'approved'});assert((await
 await yes(a,'archiveVendor',{vendorId:ids[1]});assert((await get('vendors/'+ids[1])).status==='archived','archive status');
 await no(a,'setVendorStatus',{vendorId:ids[1],status:'approved'});console.log('PASS: status update, archive, and no reactivation.');
 await yes(a,'approveVendorManager',{vendorId:ids[2]});let v=await get('vendors/'+ids[2]);assert(v.status==='approved'&&v.managerUid===app.uid&&!v.managerApplication,'application vendor fields');assert((await get('users/'+app.uid)).role==='store_manager','applicant promoted');
-await seed('vendors/'+ids[5],{ownerUid:free.uid,status:'pending',managerApplication:true});await no(a,'setVendorStatus',{vendorId:ids[5],status:'approved'});
+await seed('vendors/'+ids[5],{ownerUid:app.uid,status:'pending',managerApplication:true});await no(a,'setVendorStatus',{vendorId:ids[5],status:'approved'});
 await yes(a,'assignVendorManager',{vendorId:ids[3],managerUid:m.uid});v=await get('vendors/'+ids[3]);assert(v.managerUid===m.uid,'managerUid');assert((await get('users/'+m.uid)).storeId===ids[3],'manager storeId');
 await seed('vendors/'+ids[6],{ownerUid:app.uid,status:'approved'});await no(a,'assignVendorManager',{vendorId:ids[6],managerUid:free.uid});console.log('PASS: manager application and assignment constraints.');
 await yes(a,'updateUserRole',{targetUid:free.uid,role:'store_manager'});await yes(a,'updateUserRole',{targetUid:free.uid,role:'customer'});assert((await get('users/'+free.uid)).role==='customer','role changes');
