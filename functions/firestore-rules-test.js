@@ -11,7 +11,7 @@ const {
   assertFails
 } = require('@firebase/rules-unit-testing');
 const {
-  doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp
+  doc, collection, getDoc, getDocs, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp
 } = require('firebase/firestore');
 
 const PROJECT_ID = 'demo-moshtaryar-emulator';
@@ -115,6 +115,70 @@ test('bookings: customer can create own pending request; status and lock stay se
   await assertFails(setDoc(doc(alice, 'bookingLocks/vendor-a__2030-05-20'), {
     vendorId: 'vendor-a', date: '2030-05-20', bookingIds: ['booking-a']
   }));
+});
+
+
+test('users: private profiles cannot be listed or deleted; protected identity fields cannot be changed', async () => {
+  await seed(async db => {
+    await setDoc(doc(db, 'users/admin'), { uid: 'admin', role: 'super_admin' });
+    await setDoc(doc(db, 'users/alice'), { uid: 'alice', email: 'alice@example.test', role: 'customer' });
+  });
+  const alice = client('alice');
+  await assertFails(getDocs(collection(alice, 'users')));
+  await assertFails(deleteDoc(doc(alice, 'users/alice')));
+  await assertFails(updateDoc(doc(alice, 'users/alice'), {
+    uid: 'mallory', updatedAt: serverTimestamp()
+  }));
+  await assertFails(updateDoc(doc(alice, 'users/alice'), {
+    storeId: 'attacker-store', updatedAt: serverTimestamp()
+  }));
+  await assertSucceeds(getDoc(doc(client('admin'), 'users/alice')));
+  await assertSucceeds(getDocs(collection(client('admin'), 'users')));
+});
+
+test('vendors: ownership, manager assignment, status, and deletion are server-controlled', async () => {
+  await seed(async db => {
+    await setDoc(doc(db, 'users/manager'), { uid: 'manager', role: 'store_manager' });
+    await setDoc(doc(db, 'vendors/vendor-a'), {
+      id: 'vendor-a', ownerUid: 'owner', managerUid: 'manager', status: 'approved',
+      createdAt: new Date()
+    });
+  });
+  const owner = client('owner');
+  const manager = client('manager');
+  await assertSucceeds(getDoc(doc(owner, 'vendors/vendor-a')));
+  await assertSucceeds(getDoc(doc(manager, 'vendors/vendor-a')));
+  await assertFails(updateDoc(doc(owner, 'vendors/vendor-a'), {
+    ownerUid: 'attacker', updatedAt: serverTimestamp()
+  }));
+  await assertFails(updateDoc(doc(owner, 'vendors/vendor-a'), {
+    status: 'approved', updatedAt: serverTimestamp()
+  }));
+  await assertFails(updateDoc(doc(manager, 'vendors/vendor-a'), {
+    managerUid: 'attacker', updatedAt: serverTimestamp()
+  }));
+  await assertFails(deleteDoc(doc(owner, 'vendors/vendor-a')));
+  await assertFails(getDocs(collection(client('stranger'), 'vendors')));
+  await assertSucceeds(getDocs(query(collection(client('stranger'), 'vendors'), where('status', '==', 'approved'))));
+});
+
+test('bookings: only the customer and the related store manager can read; unknown paths stay denied', async () => {
+  await seed(async db => {
+    await setDoc(doc(db, 'vendors/vendor-a'), {
+      id: 'vendor-a', ownerUid: 'owner', managerUid: 'manager', status: 'approved'
+    });
+    await setDoc(doc(db, 'bookings/booking-a'), {
+      id: 'booking-a', customerUid: 'alice', vendorId: 'vendor-a', status: 'در انتظار تأیید'
+    });
+  });
+  await assertSucceeds(getDoc(doc(client('alice'), 'bookings/booking-a')));
+  await assertSucceeds(getDoc(doc(client('manager'), 'bookings/booking-a')));
+  await assertSucceeds(getDoc(doc(client('owner'), 'bookings/booking-a')));
+  await assertFails(getDoc(doc(client('bob'), 'bookings/booking-a')));
+  await assertSucceeds(getDocs(query(collection(client('alice'), 'bookings'), where('customerUid', '==', 'alice'))));
+  await assertFails(getDocs(collection(client('bob'), 'bookings')));
+  await assertFails(getDoc(doc(client('alice'), 'privateData/secret')));
+  await assertFails(getDoc(doc(client('alice'), 'vendors/vendor-a/private/secret')));
 });
 
 console.log('Firestore rules test suite loaded.');
