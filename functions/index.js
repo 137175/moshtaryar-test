@@ -89,7 +89,7 @@ exports.assignVendorManager = onCall(async request => {
     if (!adminSnap.exists || !isAdminRole(adminSnap.get('role'))) fail('permission-denied', 'فقط سوپرمدیر مجاز است.');
     if (!vendorSnap.exists || !managerSnap.exists) fail('not-found', 'فروشگاه یا حساب آرایشگر پیدا نشد.');
     if (vendorSnap.get('status') === 'archived') fail('failed-precondition', 'برای فروشگاه بایگانی‌شده نمی‌توان مدیر تعیین کرد.');
-    const managerRole = String(managerSnap.get('role') || '').normalize('NFKC').toLowerCase().replace(/[\\s_\\-\\u200c]/g, '');
+    const managerRole = String(managerSnap.get('role') || '').normalize('NFKC').toLowerCase().replace(/[\s_\-\u200c]/g, '');
     if (!['storemanager','مدیرفروشگاه','آرایشگر','ارایشگر'].includes(managerRole)) fail('failed-precondition', 'حساب انتخاب‌شده نقش آرایشگر ندارد.');
     const previousStoreId = String(managerSnap.get('storeId') || '').trim();
     let previousVendorRef = null;
