@@ -152,7 +152,7 @@ test('vendors: ownership, manager assignment, status, and deletion are server-co
     ownerUid: 'attacker', updatedAt: serverTimestamp()
   }));
   await assertFails(updateDoc(doc(owner, 'vendors/vendor-a'), {
-    status: 'approved', updatedAt: serverTimestamp()
+    status: 'suspended', updatedAt: serverTimestamp()
   }));
   await assertFails(updateDoc(doc(manager, 'vendors/vendor-a'), {
     managerUid: 'attacker', updatedAt: serverTimestamp()
