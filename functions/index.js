@@ -306,3 +306,4 @@ exports.cancelBooking = onCall(async request => {
   });
   return { ok: true, bookingId, status: 'لغو شده' };
 });
+
