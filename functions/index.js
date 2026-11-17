@@ -286,20 +286,26 @@ exports.cancelBooking = onCall(async request => {
     const snap = await tx.get(ref);
     if (!snap.exists) fail('not-found', 'نوبت پیدا نشد.');
     const b = snap.data();
-    if (!validDocId(b.vendorId) || !validDate(b.date)) fail('failed-precondition', 'اطلاعات فروشگاه یا تاریخ نوبت معتبر نیست.');
+    if (!validDocId(b.vendorId)) fail('failed-precondition', 'شناسه فروشگاه معتبر نیست.');
     const customer = b.customerUid === uid;
     const confirmed = ACTIVE_CONFIRMED.has(String(b.status || '').trim());
+    const dateIsValid = validDate(b.date);
+    // Pending requests with malformed legacy dates must remain cancellable.
+    // Confirmed bookings require a valid date so their coordination lock can be released safely.
+    if (!dateIsValid && confirmed) fail('failed-precondition', 'تاریخ نوبت تأییدشده معتبر نیست؛ برای جلوگیری از باقی‌ماندن قفل، ابتدا سوابق را بررسی کنید.');
     if (customer && b.status !== PENDING && !confirmed) fail('permission-denied', 'فقط نوبت خودت را در انتظار یا تأییدشده می‌توانی لغو کنی.');
     if (!customer) await authorizeManagerInTransaction(tx, uid, b.vendorId);
     if (!customer && !confirmed && b.status !== PENDING) fail('failed-precondition', 'وضعیت نوبت قابل لغو نیست.');
-    const lockRef = db.doc(`bookingLocks/${b.vendorId}__${b.date}`);
-    const lockSnap = await tx.get(lockRef);
-    if (lockSnap.exists) {
-      const entries = (Array.isArray(lockSnap.get('entries')) ? lockSnap.get('entries') : []).filter(e => e && e.bookingId !== bookingId);
-      if (entries.length) {
-        tx.set(lockRef, { vendorId: b.vendorId, date: b.date, entries, bookingIds: entries.map(e => e.bookingId), updatedAt: FieldValue.serverTimestamp() });
-      } else {
-        tx.delete(lockRef);
+    if (dateIsValid) {
+      const lockRef = db.doc(`bookingLocks/${b.vendorId}__${b.date}`);
+      const lockSnap = await tx.get(lockRef);
+      if (lockSnap.exists) {
+        const entries = (Array.isArray(lockSnap.get('entries')) ? lockSnap.get('entries') : []).filter(e => e && e.bookingId !== bookingId);
+        if (entries.length) {
+          tx.set(lockRef, { vendorId: b.vendorId, date: b.date, entries, bookingIds: entries.map(e => e.bookingId), updatedAt: FieldValue.serverTimestamp() });
+        } else {
+          tx.delete(lockRef);
+        }
       }
     }
     tx.update(ref, { status: customer ? 'لغو شده توسط مشتری' : 'لغو شده توسط آرایشگر', cancelledAt: FieldValue.serverTimestamp(), cancelledBy: uid, updatedAt: FieldValue.serverTimestamp() });
