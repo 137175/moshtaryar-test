@@ -89,8 +89,18 @@ exports.assignVendorManager = onCall(async request => {
     if (!adminSnap.exists || !isAdminRole(adminSnap.get('role'))) fail('permission-denied', 'فقط سوپرمدیر مجاز است.');
     if (!vendorSnap.exists || !managerSnap.exists) fail('not-found', 'فروشگاه یا حساب آرایشگر پیدا نشد.');
     if (vendorSnap.get('status') === 'archived') fail('failed-precondition', 'برای فروشگاه بایگانی‌شده نمی‌توان مدیر تعیین کرد.');
-    const managerRole = String(managerSnap.get('role') || '').normalize('NFKC').toLowerCase().replace(/[\s_\-\u200c]/g, '');
+    const managerRole = String(managerSnap.get('role') || '').normalize('NFKC').toLowerCase().replace(/[\\s_\\-\\u200c]/g, '');
     if (!['storemanager','مدیرفروشگاه','آرایشگر','ارایشگر'].includes(managerRole)) fail('failed-precondition', 'حساب انتخاب‌شده نقش آرایشگر ندارد.');
+    const previousStoreId = String(managerSnap.get('storeId') || '').trim();
+    let previousVendorRef = null;
+    let previousVendorSnap = null;
+    if (previousStoreId && previousStoreId !== vendorId) {
+      previousVendorRef = db.doc(`vendors/${previousStoreId}`);
+      previousVendorSnap = await tx.get(previousVendorRef);
+    }
+    if (previousVendorSnap && previousVendorSnap.exists && previousVendorSnap.get('managerUid') === managerUid) {
+      tx.update(previousVendorRef, {managerUid:null, managerUnassignedAt:FieldValue.serverTimestamp(), managerUnassignedBy:uid, updatedAt:FieldValue.serverTimestamp()});
+    }
     tx.set(managerRef, {uid:managerUid, role:'store_manager', storeId:vendorId, updatedAt:FieldValue.serverTimestamp()}, {merge:true});
     tx.update(vendorRef, {managerUid, updatedAt:FieldValue.serverTimestamp(), managerAssignedBy:uid, managerAssignedAt:FieldValue.serverTimestamp()});
   });
