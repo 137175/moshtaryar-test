@@ -9,7 +9,8 @@
     "check": "node --check index.js && node --check domain.js",
     "test": "node local-unit-check.js",
     "test:emulator": "node emulator-concurrency-test.js",
-    "test:rules": "node firestore-rules-test.js"
+    "test:rules": "node firestore-rules-test.js",
+    "test:admin": "node admin-callables-test.js"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",
