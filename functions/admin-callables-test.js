@@ -23,6 +23,7 @@ await seed('vendors/'+ids[0],{ownerUid:app.uid,status:'pending',managerApplicati
 await seed('vendors/'+ids[1],{ownerUid:app.uid,status:'approved'});
 await seed('vendors/'+ids[2],{ownerUid:app.uid,status:'pending',managerApplication:true});
 await seed('vendors/'+ids[3],{ownerUid:app.uid,status:'approved'});
+const oldManaged='adm-old-managed-'+s;await seed('vendors/'+oldManaged,{ownerUid:app.uid,managerUid:m.uid,status:'approved'});await db.doc('users/'+m.uid).update({storeId:oldManaged});
 
 for(const [n,d] of [['setVendorStatus',{vendorId:ids[0],status:'approved'}],['archiveVendor',{vendorId:ids[1]}],['assignVendorManager',{vendorId:ids[3],managerUid:m.uid}],['approveVendorManager',{vendorId:ids[2]}],['updateUserRole',{targetUid:free.uid,role:'store_manager'}]])await no(c,n,d);
 console.log('PASS: customer denied on all five admin callables.');
@@ -31,7 +32,7 @@ await yes(a,'archiveVendor',{vendorId:ids[1]});assert((await get('vendors/'+ids[
 await no(a,'setVendorStatus',{vendorId:ids[1],status:'approved'});console.log('PASS: status update, archive, and no reactivation.');
 await yes(a,'approveVendorManager',{vendorId:ids[2]});let v=await get('vendors/'+ids[2]);assert(v.status==='approved'&&v.managerUid===app.uid&&!v.managerApplication,'application vendor fields');assert((await get('users/'+app.uid)).role==='store_manager','applicant promoted');
 await seed('vendors/'+ids[5],{ownerUid:app.uid,status:'pending',managerApplication:true});await no(a,'setVendorStatus',{vendorId:ids[5],status:'approved'});
-await yes(a,'assignVendorManager',{vendorId:ids[3],managerUid:m.uid});v=await get('vendors/'+ids[3]);assert(v.managerUid===m.uid,'managerUid');assert((await get('users/'+m.uid)).storeId===ids[3],'manager storeId');
+await yes(a,'assignVendorManager',{vendorId:ids[3],managerUid:m.uid});v=await get('vendors/'+ids[3]);assert(v.managerUid===m.uid,'managerUid');assert((await get('users/'+m.uid)).storeId===ids[3],'manager storeId');assert((await get('vendors/'+oldManaged)).managerUid===null,'previous store manager assignment must be cleared');
 await seed('vendors/'+ids[6],{ownerUid:app.uid,status:'approved'});await no(a,'assignVendorManager',{vendorId:ids[6],managerUid:free.uid});console.log('PASS: manager application and assignment constraints.');
 await yes(a,'updateUserRole',{targetUid:free.uid,role:'store_manager'});await yes(a,'updateUserRole',{targetUid:free.uid,role:'customer'});assert((await get('users/'+free.uid)).role==='customer','role changes');
 await seed('vendors/'+ids[4],{ownerUid:free.uid,status:'approved'});
