@@ -53,6 +53,9 @@ test('users: self-registration is customer-only and role escalation is denied', 
   await assertFails(setDoc(doc(alice, 'users/alice'), {
     uid: 'alice', email: 'alice@example.test', role: 'super_admin'
   }));
+  await assertFails(setDoc(doc(alice, 'users/alice-with-store'), {
+    uid: 'alice', email: 'alice@example.test', role: 'customer', storeId: 'victim-store'
+  }));
   await assertFails(updateDoc(doc(alice, 'users/alice'), {
     role: 'super_admin', updatedAt: serverTimestamp()
   }));
