@@ -40,6 +40,14 @@ async function callApprove(idToken, bookingId) {
   const body = await response.json();
   return { ok: response.ok && !!body.result, status: response.status, body };
 }
+async function callCancel(idToken, bookingId) {
+  const response = await fetch(`http://127.0.0.1:5001/${PROJECT_ID}/${REGION}/cancelBooking`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ data: { bookingId } })
+  });
+  const body = await response.json();
+  return { ok: response.ok && !!body.result, status: response.status, body };
+}
 function assert(condition, message) { if (!condition) throw new Error(`ASSERTION FAILED: ${message}`); }
 
 (async () => {
@@ -51,6 +59,7 @@ function assert(condition, message) { if (!condition) throw new Error(`ASSERTION
   const date = '2030-05-20';
   const bookingA = `emulator-booking-a-${suffix}`;
   const bookingB = `emulator-booking-b-${suffix}`;
+  const malformedDateBooking = `emulator-booking-invalid-date-${suffix}`;
   const lockRef = db.doc(`bookingLocks/${vendorId}__${date}`);
   try {
     await db.doc(`users/${manager.uid}`).set({ uid: manager.uid, role: 'store_manager' });
@@ -97,10 +106,24 @@ function assert(condition, message) { if (!condition) throw new Error(`ASSERTION
     const finalLock = await lockRef.get();
     assert(finalLock.exists && (finalLock.get('entries') || []).length === 1, 'lock must contain exactly one entry after retry');
     console.log('PASS: simultaneous approval allowed exactly one booking; cancellation released the lock; second booking then approved.');
+
+    // A malformed pending legacy request must still be cancellable by its customer.
+    // It cannot have a valid approval lock because approval rejects invalid calendar dates.
+    await db.doc(`bookings/${malformedDateBooking}`).set({
+      id: malformedDateBooking, vendorId, customerUid: customerA.uid,
+      date: '2030-02-31', time: '11:00', service: 'اصلاح مو',
+      status: 'در انتظار تأیید'
+    });
+    const malformedCancel = await callCancel(customerA.idToken, malformedDateBooking);
+    assert(malformedCancel.ok, `customer could not cancel malformed-date pending request: ${JSON.stringify(malformedCancel.body)}`);
+    const malformedAfter = await db.doc(`bookings/${malformedDateBooking}`).get();
+    assert(malformedAfter.get('status') === 'لغو شده توسط مشتری', 'malformed pending request must be marked cancelled');
+    console.log('PASS: customer can cancel a pending request with an invalid calendar date.');
   } finally {
     await Promise.all([
       db.doc(`bookings/${bookingA}`).delete().catch(() => {}),
       db.doc(`bookings/${bookingB}`).delete().catch(() => {}),
+      db.doc(`bookings/${malformedDateBooking}`).delete().catch(() => {}),
       lockRef.delete().catch(() => {}),
       db.doc(`vendors/${vendorId}`).delete().catch(() => {}),
       db.doc(`users/${manager.uid}`).delete().catch(() => {}),

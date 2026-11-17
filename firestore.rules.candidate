@@ -53,7 +53,7 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if signedIn()
         && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['uid','email','role','storeId','createdAt','updatedAt'])
+        && request.resource.data.keys().hasOnly(['uid','email','role','createdAt','updatedAt'])
         && request.resource.data.uid == userId
         && request.resource.data.role == 'customer';
       // Role and store assignment changes are callable-only (Admin SDK).
