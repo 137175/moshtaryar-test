@@ -95,7 +95,8 @@ async function callFunction(name, idToken, payload) {
     const pendingId = approvedId === bookingA ? bookingB : bookingA;
 
     // A different customer must not cancel another customer's confirmed booking.
-    const crossCustomerCancel = await callFunction('cancelBooking', customerB.idToken, { bookingId: approvedId });
+    const attackerToken = approvedId === bookingA ? customerB.idToken : customerA.idToken;
+    const crossCustomerCancel = await callFunction('cancelBooking', attackerToken, { bookingId: approvedId });
     assert(!crossCustomerCancel.ok, 'a customer must not cancel another customer booking');
     const unchangedAfterAttack = await db.doc(`bookings/${approvedId}`).get();
     assert(unchangedAfterAttack.get('status') === 'تأیید شده', 'unauthorized cancellation must leave booking unchanged');
