@@ -13,7 +13,7 @@ function fail(code, message) { throw new HttpsError(code, message); }
 
 async function authorizeManager(uid, vendorId) {
   const [profileSnap, vendorSnap] = await Promise.all([
-    db.doc(\`users/\${uid}\`).get(), db.doc(\`vendors/\${vendorId}\`).get()
+    db.doc(`users/${uid}`).get(), db.doc(`vendors/${vendorId}`).get()
   ]);
   if (!profileSnap.exists || !vendorSnap.exists) fail('not-found', 'حساب یا فروشگاه پیدا نشد.');
   const admin = isAdminRole(profileSnap.get('role'));
@@ -23,8 +23,8 @@ async function authorizeManager(uid, vendorId) {
 }
 
 async function authorizeManagerInTransaction(tx, uid, vendorId) {
-  const profileRef = db.doc(\`users/\${uid}\`);
-  const vendorRef = db.doc(\`vendors/\${vendorId}\`);
+  const profileRef = db.doc(`users/${uid}`);
+  const vendorRef = db.doc(`vendors/${vendorId}`);
   const [profileSnap, vendorSnap] = await Promise.all([tx.get(profileRef), tx.get(vendorRef)]);
   if (!profileSnap.exists || !vendorSnap.exists) fail('not-found', 'حساب یا فروشگاه پیدا نشد.');
   const admin = isAdminRole(profileSnap.get('role'));
@@ -43,7 +43,7 @@ function requireAuth(request) {
 }
 
 async function requireSuperAdmin(uid) {
-  const snap = await db.doc(\`users/\${uid}\`).get();
+  const snap = await db.doc(`users/${uid}`).get();
   if (!snap.exists || !isAdminRole(snap.get('role'))) fail('permission-denied', 'فقط سوپرمدیر مجاز است.');
 }
 
@@ -52,18 +52,18 @@ exports.approveVendorManager = onCall(async request => {
   const vendorId = String(request.data && request.data.vendorId || '').trim();
   if (!validDocId(vendorId)) fail('invalid-argument', 'شناسه فروشگاه معتبر نیست.');
   await db.runTransaction(async tx => {
-    const adminRef = db.doc(\`users/\${uid}\`);
-    const vendorRef = db.doc(\`vendors/\${vendorId}\`);
+    const adminRef = db.doc(`users/${uid}`);
+    const vendorRef = db.doc(`vendors/${vendorId}`);
     const [adminSnap, vendorSnap] = await Promise.all([tx.get(adminRef), tx.get(vendorRef)]);
     if (!adminSnap.exists || !isAdminRole(adminSnap.get('role'))) fail('permission-denied', 'فقط سوپرمدیر مجاز است.');
     if (!vendorSnap.exists) fail('not-found', 'فروشگاه پیدا نشد.');
     const vendor = vendorSnap.data();
     if (vendor.status === 'archived') fail('failed-precondition', 'فروشگاه بایگانی‌شده قابل تأیید مجدد نیست.');
     if (!vendor.managerApplication || !validDocId(vendor.ownerUid)) fail('failed-precondition', 'درخواست آرایشگری معتبر یا در انتظار نیست.');
-    const applicantRef = db.doc(\`users/\${vendor.ownerUid}\`);
+    const applicantRef = db.doc(`users/${vendor.ownerUid}`);
     const applicantSnap = await tx.get(applicantRef);
     if (!applicantSnap.exists) fail('failed-precondition', 'حساب متقاضی پیدا نشد.');
-    const applicantRole = String(applicantSnap.get('role') || '').normalize('NFKC').toLowerCase().replace(/[\\s_\\-\\u200c]/g, '');
+    const applicantRole = String(applicantSnap.get('role') || '').normalize('NFKC').toLowerCase().replace(/[\s_\-\u200c]/g, '');
     const applicantIsAdmin = isAdminRole(applicantSnap.get('role'));
     const applicantIsManager = ['storemanager','مدیرفروشگاه','آرایشگر','ارایشگر'].includes(applicantRole);
     if (!applicantIsAdmin && !applicantIsManager && applicantRole !== 'customer' && applicantRole !== 'مشتری') {
@@ -82,14 +82,14 @@ exports.assignVendorManager = onCall(async request => {
   const managerUid = String(request.data && request.data.managerUid || '').trim();
   if (!validDocId(vendorId) || !validDocId(managerUid)) fail('invalid-argument', 'شناسه فروشگاه یا آرایشگر معتبر نیست.');
   await db.runTransaction(async tx => {
-    const adminRef = db.doc(\`users/\${uid}\`);
-    const vendorRef = db.doc(\`vendors/\${vendorId}\`);
-    const managerRef = db.doc(\`users/\${managerUid}\`);
+    const adminRef = db.doc(`users/${uid}`);
+    const vendorRef = db.doc(`vendors/${vendorId}`);
+    const managerRef = db.doc(`users/${managerUid}`);
     const [adminSnap, vendorSnap, managerSnap] = await Promise.all([tx.get(adminRef), tx.get(vendorRef), tx.get(managerRef)]);
     if (!adminSnap.exists || !isAdminRole(adminSnap.get('role'))) fail('permission-denied', 'فقط سوپرمدیر مجاز است.');
     if (!vendorSnap.exists || !managerSnap.exists) fail('not-found', 'فروشگاه یا حساب آرایشگر پیدا نشد.');
     if (vendorSnap.get('status') === 'archived') fail('failed-precondition', 'برای فروشگاه بایگانی‌شده نمی‌توان مدیر تعیین کرد.');
-    const managerRole = String(managerSnap.get('role') || '').normalize('NFKC').toLowerCase().replace(/[\\s_\\-\\u200c]/g, '');
+    const managerRole = String(managerSnap.get('role') || '').normalize('NFKC').toLowerCase().replace(/[\s_\-\u200c]/g, '');
     if (!['storemanager','مدیرفروشگاه','آرایشگر','ارایشگر'].includes(managerRole)) fail('failed-precondition', 'حساب انتخاب‌شده نقش آرایشگر ندارد.');
     tx.set(managerRef, {uid:managerUid, role:'store_manager', storeId:vendorId, updatedAt:FieldValue.serverTimestamp()}, {merge:true});
     tx.update(vendorRef, {managerUid, updatedAt:FieldValue.serverTimestamp(), managerAssignedBy:uid, managerAssignedAt:FieldValue.serverTimestamp()});
@@ -106,8 +106,8 @@ exports.setVendorStatus = onCall(async request => {
     fail('invalid-argument', 'شناسه فروشگاه یا وضعیت معتبر نیست.');
   }
   await db.runTransaction(async tx => {
-    const actorRef = db.doc(\`users/\${uid}\`);
-    const vendorRef = db.doc(\`vendors/\${vendorId}\`);
+    const actorRef = db.doc(`users/${uid}`);
+    const vendorRef = db.doc(`vendors/${vendorId}`);
     const [actorSnap, vendorSnap] = await Promise.all([tx.get(actorRef), tx.get(vendorRef)]);
     if (!actorSnap.exists || !isAdminRole(actorSnap.get('role'))) fail('permission-denied', 'فقط سوپرمدیر مجاز است.');
     if (!vendorSnap.exists) fail('not-found', 'فروشگاه پیدا نشد.');
@@ -132,8 +132,8 @@ exports.archiveVendor = onCall(async request => {
   const vendorId = String(request.data && request.data.vendorId || '').trim();
   if (!validDocId(vendorId)) fail('invalid-argument', 'شناسه فروشگاه معتبر نیست.');
   await db.runTransaction(async tx => {
-    const actorRef = db.doc(\`users/\${uid}\`);
-    const vendorRef = db.doc(\`vendors/\${vendorId}\`);
+    const actorRef = db.doc(`users/${uid}`);
+    const vendorRef = db.doc(`vendors/${vendorId}`);
     const [actorSnap, vendorSnap] = await Promise.all([tx.get(actorRef), tx.get(vendorRef)]);
     if (!actorSnap.exists || !isAdminRole(actorSnap.get('role'))) fail('permission-denied', 'فقط سوپرمدیر مجاز است.');
     if (!vendorSnap.exists) fail('not-found', 'فروشگاه پیدا نشد.');
@@ -154,8 +154,8 @@ exports.updateUserRole = onCall(async request => {
   if (!validDocId(targetUid) || !allowed.has(role)) fail('invalid-argument', 'شناسه کاربر یا نقش معتبر نیست.');
   if (targetUid === uid && role !== 'super_admin') fail('failed-precondition', 'نمی‌توانی نقش مدیریتی حساب خودت را تغییر بدهی.');
   await db.runTransaction(async tx => {
-    const actorRef = db.doc(\`users/\${uid}\`);
-    const targetRef = db.doc(\`users/\${targetUid}\`);
+    const actorRef = db.doc(`users/${uid}`);
+    const targetRef = db.doc(`users/${targetUid}`);
     const [actorSnap, targetSnap] = await Promise.all([tx.get(actorRef), tx.get(targetRef)]);
     if (!actorSnap.exists || !isAdminRole(actorSnap.get('role'))) fail('permission-denied', 'فقط سوپرمدیر مجاز است.');
     if (!targetSnap.exists) fail('not-found', 'حساب کاربر پیدا نشد.');
@@ -187,7 +187,7 @@ exports.approveBooking = onCall(async request => {
   const uid = requireAuth(request);
   const bookingId = String(request.data && request.data.bookingId || '').trim();
   if (!validDocId(bookingId)) fail('invalid-argument', 'شناسه نوبت معتبر نیست.');
-  const bookingRef = db.doc(\`bookings/\${bookingId}\`);
+  const bookingRef = db.doc(`bookings/${bookingId}`);
   const initial = await bookingRef.get();
   if (!initial.exists) fail('not-found', 'نوبت پیدا نشد.');
   const first = initial.data();
@@ -199,11 +199,11 @@ exports.approveBooking = onCall(async request => {
   if (start === null || duration === null) fail('failed-precondition', 'ساعت یا مدت خدمت معتبر نیست؛ مدت خدمت را مدیر فروشگاه تعریف کند.');
   const candidate = { bookingId, startMin: start, endMin: start + duration };
   if (candidate.endMin > 1440) fail('failed-precondition', 'مدت خدمت از پایان روز عبور می‌کند.');
-  const lockRef = db.doc(\`bookingLocks/\${first.vendorId}__\${first.date}\`);
+  const lockRef = db.doc(`bookingLocks/${first.vendorId}__${first.date}`);
 
   await db.runTransaction(async tx => {
     const [bookingSnap, vendorSnap, lockSnap, daySnap] = await Promise.all([
-      tx.get(bookingRef), tx.get(db.doc(\`vendors/\${first.vendorId}\`)), tx.get(lockRef),
+      tx.get(bookingRef), tx.get(db.doc(`vendors/${first.vendorId}`)), tx.get(lockRef),
       tx.get(db.collection('bookings').where('vendorId', '==', first.vendorId).where('date', '==', first.date))
     ]);
     if (!bookingSnap.exists || !vendorSnap.exists) fail('not-found', 'نوبت یا فروشگاه پیدا نشد.');
@@ -212,7 +212,7 @@ exports.approveBooking = onCall(async request => {
     const currentVendor = vendorSnap.data();
     if (currentVendor.status !== 'approved') fail('failed-precondition', 'این فروشگاه در حال حاضر تأییدشده نیست.');
     if (currentVendor.managerUid !== uid && currentVendor.ownerUid !== uid) {
-      const p = await tx.get(db.doc(\`users/\${uid}\`));
+      const p = await tx.get(db.doc(`users/${uid}`));
       if (!p.exists || !isAdminRole(p.get('role'))) fail('permission-denied', 'اجازه تأیید این فروشگاه را نداری.');
     }
     const currentDuration = serviceDuration(currentVendor, b.service);
@@ -264,7 +264,7 @@ exports.rejectBooking = onCall(async request => {
   const uid = requireAuth(request);
   const bookingId = String(request.data && request.data.bookingId || '').trim();
   if (!validDocId(bookingId)) fail('invalid-argument', 'شناسه نوبت معتبر نیست.');
-  const ref = db.doc(\`bookings/\${bookingId}\`);
+  const ref = db.doc(`bookings/${bookingId}`);
   await db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     if (!snap.exists) fail('not-found', 'نوبت پیدا نشد.');
@@ -281,7 +281,7 @@ exports.cancelBooking = onCall(async request => {
   const uid = requireAuth(request);
   const bookingId = String(request.data && request.data.bookingId || '').trim();
   if (!validDocId(bookingId)) fail('invalid-argument', 'شناسه نوبت معتبر نیست.');
-  const ref = db.doc(\`bookings/\${bookingId}\`);
+  const ref = db.doc(`bookings/${bookingId}`);
   await db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     if (!snap.exists) fail('not-found', 'نوبت پیدا نشد.');
@@ -292,7 +292,7 @@ exports.cancelBooking = onCall(async request => {
     if (customer && b.status !== PENDING && !confirmed) fail('permission-denied', 'فقط نوبت خودت را در انتظار یا تأییدشده می‌توانی لغو کنی.');
     if (!customer) await authorizeManagerInTransaction(tx, uid, b.vendorId);
     if (!customer && !confirmed && b.status !== PENDING) fail('failed-precondition', 'وضعیت نوبت قابل لغو نیست.');
-    const lockRef = db.doc(\`bookingLocks/\${b.vendorId}__\${b.date}\`);
+    const lockRef = db.doc(`bookingLocks/${b.vendorId}__${b.date}`);
     const lockSnap = await tx.get(lockRef);
     if (lockSnap.exists) {
       const entries = (Array.isArray(lockSnap.get('entries')) ? lockSnap.get('entries') : []).filter(e => e && e.bookingId !== bookingId);
