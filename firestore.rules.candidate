@@ -1,0 +1,140 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+          in ['super_admin','superadmin','سوپر_مدیر','سوپر مدیر','سوپرمدیر','سوپر_ادمین','سوپر ادمین','سوپرادمین','مدیر_کل','مدیر کل','مدیرکل'];
+    }
+
+    function isManagerOf(vendorId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/vendors/$(vendorId))
+        && get(/databases/$(database)/documents/vendors/$(vendorId)).data.managerUid == request.auth.uid;
+    }
+
+    function isOwnerOf(vendorId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/vendors/$(vendorId))
+        && get(/databases/$(database)/documents/vendors/$(vendorId)).data.ownerUid == request.auth.uid;
+    }
+
+    function isStoreManager() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+          in ['store_manager','مدیر_فروشگاه','مدیر فروشگاه','آرایشگر','ارایشگر'];
+    }
+
+    function lockPath(vendorId, date) {
+      return /databases/$(database)/documents/bookingLocks/$(vendorId + '__' + date);
+    }
+
+    function lockContainsAfter(bookingId, vendorId, date) {
+      return existsAfter(lockPath(vendorId, date))
+        && getAfter(lockPath(vendorId, date)).data.bookingIds is list
+        && getAfter(lockPath(vendorId, date)).data.bookingIds.hasAny([bookingId])
+        && getAfter(lockPath(vendorId, date)).data.updatedAt == request.time;
+    }
+
+    function lockReleasedAfter(bookingId, vendorId, date) {
+      return !existsAfter(lockPath(vendorId, date))
+        || (getAfter(lockPath(vendorId, date)).data.bookingIds is list
+          && !getAfter(lockPath(vendorId, date)).data.bookingIds.hasAny([bookingId])
+          && getAfter(lockPath(vendorId, date)).data.updatedAt == request.time);
+    }
+
+    match /users/{userId} {
+      allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['uid','email','role','storeId','createdAt','updatedAt'])
+        && request.resource.data.uid == userId
+        && request.resource.data.role == 'customer';
+      // Role and store assignment changes are callable-only (Admin SDK).
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','updatedAt']);
+      // Preserve account/audit history; account deletion is an administrative backend task.
+      allow delete: if false;
+    }
+
+    match /vendors/{vendorId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.status == 'approved')
+        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || (signedIn() && resource.data.managerUid == request.auth.uid);
+      // Client-created vendor documents may contain only public/profile fields
+      // plus the minimum ownership/application fields. Server metadata is never client-writable.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'id','name','phone','mobile','address','detail','rubika','services','hours',
+          'weeklyHours','weeklySchedule','schedule','bookingIntervalMinutes','lat','lng','faq',
+          'ownerUid','managerUid','status','managerApplication','createdAt','updatedAt'
+        ])
+        && request.resource.data.id == vendorId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && (!('managerApplication' in request.resource.data) || request.resource.data.managerApplication is bool)
+        && (request.resource.data.managerUid == null
+          || (request.resource.data.managerUid == request.auth.uid && isStoreManager()));
+      // Owners/managers can edit only ordinary profile fields. Even admins must
+      // use callable functions for status, ownership, manager, and audit metadata.
+      allow update: if resource.data.status != 'archived'
+        && (isOwnerOf(vendorId) || isManagerOf(vendorId) || isAdmin())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name','phone','mobile','address','detail','rubika','services','hours',
+          'weeklyHours','weeklySchedule','schedule','bookingIntervalMinutes','lat','lng','faq','updatedAt'
+        ])
+        && request.resource.data.updatedAt == request.time;
+      // Vendor records are archived through the trusted callable; never physically deleted from clients.
+      allow delete: if false;
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.customerUid == request.auth.uid)
+        || (signedIn() && isManagerOf(resource.data.vendorId))
+        || (signedIn() && isOwnerOf(resource.data.vendorId));
+
+      // Client may only create a pending request for itself.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'id','customerUid','vendorId','vendorName','vendorPhone','vendorRubika',
+          'name','phone','service','date','time','note','status','createdAt','updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'id','customerUid','vendorId','name','phone','service','date','time','status','createdAt','updatedAt'
+        ])
+        && request.resource.data.id == bookingId
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.status == 'در انتظار تأیید'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.name is string
+        && request.resource.data.phone is string
+        && request.resource.data.service is string
+        && request.resource.data.vendorId is string
+        && request.resource.data.date is string
+        && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.time is string
+        && request.resource.data.time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        && exists(/databases/$(database)/documents/vendors/$(request.resource.data.vendorId))
+        && get(/databases/$(database)/documents/vendors/$(request.resource.data.vendorId)).data.status == 'approved';
+
+      // All status changes (approve/reject/cancel) must go through callable server functions.
+      allow update, delete: if false;
+    }
+
+    match /bookingLocks/{lockId} {
+      // Locks are private server-owned coordination data. Admin SDK functions bypass these rules.
+      allow read, write: if false;
+    }
+  }
+}
