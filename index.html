@@ -117,8 +117,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
   <p id="vendorFormMsg" class="muted" role="status"></p>
  </form>
 </section>
-<section id="page-booking" class="page">
- <div class="section-title"><h2>رزرو نوبت</h2></div>
+<section id="page-booking" class="page"> <div class="section-title"><h2>رزرو نوبت</h2></div>
  <form id="bookingForm" class="form-card">
   <label for="bookVendor">انتخاب فروشگاه *</label><select id="bookVendor" required></select>
   <label for="bookName">نام شما *</label><input id="bookName" required maxlength="80" placeholder="نام و نام خانوادگی">
@@ -182,6 +181,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signOut
@@ -207,6 +207,10 @@ let app = null, auth = null, db = null;
 
 if (firebaseConfigured) {
   app = initializeApp(firebaseConfig);
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider("6LcrSCYuAAAAAE3a4XOCe1f2tT95Y4AF1gvicY3E"),
+    isTokenAutoRefreshEnabled: true
+  });
   auth = getAuth(app);
   db = getFirestore(app);
 }
@@ -237,8 +241,7 @@ async function saveVendor(v) {
     createdAt:v.createdAt || serverTimestamp(), updatedAt:serverTimestamp()
   }), {merge:true});
 }
-async function updateVendor(v) {
-  await setDoc(doc(db,"vendors",v.id), clean({...v,updatedAt:serverTimestamp()}), {merge:true});
+async function updateVendor(v) {  await setDoc(doc(db,"vendors",v.id), clean({...v,updatedAt:serverTimestamp()}), {merge:true});
 }
 async function saveBooking(b) {
   const user = auth?.currentUser;
@@ -357,8 +360,7 @@ let vendors=loadJSON(STORAGE_VENDORS,DEFAULT_VENDORS), bookings=loadJSON(STORAGE
 if(!Array.isArray(vendors))vendors=DEFAULT_VENDORS;
 vendors=vendors.filter(v=>v && v.id!=='sample-clinic' && v.id!=='sample-repair');
 // Repair older service entries where the price was typed in the service name.
-function normalizeService(s){
- if(!s || typeof s!=='object') return s;
+function normalizeService(s){ if(!s || typeof s!=='object') return s;
  const fallback=/^(?:برای قیمت تماس بگیرید|استعلام|قیمت نامشخص|ثبت نشده)$/i;
  const priceText=String(s.price||'').trim();
  const needsPrice=!priceText || fallback.test(priceText);
@@ -477,8 +479,7 @@ window.moshtaryarLogin = async function(e){
   if(!window.MoshtaryarCloud){
     msg.textContent='اتصال Firebase بارگذاری نشد. اینترنت گوشی را بررسی کن و صفحه را دوباره باز کن.';
     return false;
-  }
-  if(!window.MoshtaryarCloud.firebaseConfigured || !window.MoshtaryarCloud.auth){
+  }  if(!window.MoshtaryarCloud.firebaseConfigured || !window.MoshtaryarCloud.auth){
     msg.textContent='تنظیمات اتصال Firebase کامل نیست.';
     return false;
   }
@@ -597,8 +598,7 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
   let v;
   if(editingVendorId){
     v=vendors.find(x=>x.id===editingVendorId);
-    if(!v){alert('فروشگاه برای ویرایش پیدا نشد.');return}
-    Object.assign(v,data);
+    if(!v){alert('فروشگاه برای ویرایش پیدا نشد.');return}    Object.assign(v,data);
   }else{
     v={id:'v-'+Date.now(),...data,ownerUid:currentUser?.uid||null,managerUid:currentRole==='store_manager'?(currentUser?.uid||null):null,status:'pending',managerApplication:currentRole==='customer'&&!!currentUser};
     vendors.push(v);
@@ -717,8 +717,7 @@ function addBotMessage(text){
    section.appendChild(heading);
   }
   const body=document.createElement('div');
-  body.className='answer-lines';
-  (hasHeading?lines.slice(1):lines).forEach(line=>{
+  body.className='answer-lines';  (hasHeading?lines.slice(1):lines).forEach(line=>{
    const item=document.createElement('div');
    item.className='answer-line'+(/^([•●▪︎*-])\\s*/.test(line)?' bullet':'');
    item.textContent=line.replace(/^([•●▪︎*-])\\s*/, '• ');
@@ -837,8 +836,7 @@ function answerQuestion(question){
   const rawQuestion=String(question||'').toLocaleLowerCase('fa').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[\u200c\sـ]+/g,' ').trim();
   const asksToday=/امروز|الان|فعلا|درحال حاضر/.test(normalizeAssistantText(rawQuestion))||/امروز|الان|فعلا|درحال حاضر/.test(q);
   if(asksToday){
-   if(!hoursText){
-    out.push(`ساعات کاری ${v.name} ثبت نشده است؛ نمی‌توانم بگویم امروز باز است یا نه.`);
+   if(!hoursText){    out.push(`ساعات کاری ${v.name} ثبت نشده است؛ نمی‌توانم بگویم امروز باز است یا نه.`);
    }else{
     const normalizedHours=normalizeAssistantText(hoursText);
     const timeMatches=[...normalizedHours.matchAll(/(\d{1,2})(?:[:٫](\d{1,2}))?\s*(صبح|بعد از ظهر|عصر|شب|بامداد)?/g)];
@@ -957,8 +955,7 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
   };
 
   window.renderHome=function(){
-    const visible=(currentRole==='super_admin'||currentRole==='store_manager')?vendors:vendors.filter(v=>v.status==='approved');
-    document.getElementById('statVendors').textContent=visible.length;
+    const visible=(currentRole==='super_admin'||currentRole==='store_manager')?vendors:vendors.filter(v=>v.status==='approved');    document.getElementById('statVendors').textContent=visible.length;
     document.getElementById('statBookings').textContent=bookings.length;
     document.getElementById('homeVendors').innerHTML=orderedVendors(visible).map(vendorCard).join('')||'<div class="empty">هنوز فروشگاه تأییدشده‌ای ثبت نشده است.</div>';
   };
@@ -1077,8 +1074,7 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
     bookings=[];localSaveAll();renderPanel();renderHome();
   };
 
-  window.migrateLocalDataToCloud=async function(){
-    if(!cloudReady||!currentUser)return alert('ابتدا وارد حساب شو.');
+  window.migrateLocalDataToCloud=async function(){    if(!cloudReady||!currentUser)return alert('ابتدا وارد حساب شو.');
     if(!vendors.length&&!bookings.length)return alert('اطلاعات محلی برای انتقال وجود ندارد.');
     if(!confirm('اطلاعات محلی فقط به رکوردهای جدید اضافه می‌شود؛ رکوردهای موجود بازنویسی نمی‌شوند و اطلاعات محلی حذف نمی‌شود. ادامه؟'))return;
     try{
