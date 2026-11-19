@@ -38,6 +38,7 @@ button:disabled{opacity:.55}
 </main>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check.js";
 import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
@@ -52,6 +53,10 @@ const firebaseConfig = {
   measurementId: "G-XGP5J7PFXH"
 };
 const app = initializeApp(firebaseConfig);
+initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider("6LcrSCYuAAAAAE3a4XOCe1f2tT95Y4AF1gvicY3E"),
+    isTokenAutoRefreshEnabled: true
+  });
 const auth = getAuth(app);
 const db = getFirestore(app);
 const $ = id => document.getElementById(id);
