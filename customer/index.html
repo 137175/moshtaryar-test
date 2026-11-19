@@ -183,6 +183,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signOut
@@ -208,6 +209,10 @@ let app = null, auth = null, db = null;
 
 if (firebaseConfigured) {
   app = initializeApp(firebaseConfig);
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider("6LcrSCYuAAAAAE3a4XOCe1f2tT95Y4AF1gvicY3E"),
+    isTokenAutoRefreshEnabled: true
+  });
   auth = getAuth(app);
   db = getFirestore(app);
 }
