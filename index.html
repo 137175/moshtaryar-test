@@ -49,7 +49,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
 <header>
  <div class="head-inner">
   <div class="brand"><div class="logo">🤝</div><div><h1>مشتریار</h1><p>دستیار خدمات و نوبت‌دهی</p></div></div>
-  <span class="badge">نسخه مشتری مشتریار</span>
+  <span class="badge">نسخه مدیریت مشتریار</span>
   <nav class="desktop-nav" aria-label="منوی مشتری">
    <button data-page="home" onclick="showPage('home')">خانه</button>
    <button data-page="vendors" onclick="showPage('vendors')">فروشگاه‌ها</button>
@@ -57,6 +57,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
    <button data-page="booking" onclick="showPage('booking')">رزرو نوبت</button>
    <button data-page="my-bookings" onclick="showPage('my-bookings')">نوبت‌های من</button>
    <button data-page="chat" onclick="showPage('chat')">دستیار</button>
+   <button data-page="panel" onclick="showPage('panel')">پنل مدیریت</button>
   </nav>
  </div>
 </header>
@@ -147,7 +148,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
  <div class="notice">این دستیار رایگان و بدون اتصال به سرویس پولی است. پاسخ‌ها از اطلاعات ثبت‌شدهٔ فروشگاه می‌آیند؛ اگر چیزی ثبت نشده باشد، حدس نمی‌زند و برای سؤال مبهم از تو توضیح بیشتر می‌خواهد.</div>
  <div class="btn-row"><button class="btn secondary" onclick="quickAsk('قیمت خدمات چقدر است؟')">قیمت‌ها</button><button class="btn secondary" onclick="quickAsk('آدرس کجاست؟')">آدرس</button><button class="btn secondary" onclick="quickAsk('ساعات کاری چیست؟')">ساعات کاری</button><button class="btn secondary" onclick="quickAsk('چه خدماتی دارید؟')">خدمات</button></div>
 </section>
-<section id="page-panel" style="display:none" class="page">
+<section id="page-panel" class="page">
  <div class="section-title"><h2 id="panelTitle">پنل مدیریت</h2><button id="clearBookingsBtn" class="btn danger" onclick="clearBookings()">پاک‌کردن نوبت‌ها</button></div>
  <div id="panelRoleNotice" class="notice"></div>
  <div id="panelBookingsList"></div>
@@ -167,6 +168,7 @@ footer{text-align:center;color:#94a3b8;font-size:10px;padding:18px}
  <button data-page="booking" onclick="showPage('booking')"><span class="ico">📅</span><span>رزرو</span></button>
  <button data-page="my-bookings" onclick="showPage('my-bookings')"><span class="ico">🧾</span><span>نوبت‌های من</span></button>
  <button data-page="chat" onclick="showPage('chat')"><span class="ico">🤖</span><span>دستیار</span></button>
+ <button data-page="panel" onclick="showPage('panel')"><span class="ico">🛠️</span><span>پنل</span></button>
 </nav>
 
 <div id="confirmDeleteModal" class="confirm-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="confirmDeleteTitle">
@@ -1158,22 +1160,8 @@ function renderMyBookings(){
 }
 
 (function(){
- const msg=()=>document.getElementById('authMsg');
- window.addEventListener('moshtaryar-auth',async function(ev){
-   if(!ev.detail)return;
-   try{
-     const p=await window.MoshtaryarCloud.getUserProfile(ev.detail.uid);
-     const r=normalizeRole(p?.role);
-     if(r!=='customer'){
-       if(msg())msg().textContent='این حساب مشتری نیست. برای ورود به پنل مدیریت از نشانی نسخه مدیریت استفاده کن.';
-       await window.MoshtaryarCloud.signOut();
-       return;
-     }
-     currentRole='customer';
-     document.querySelectorAll('[data-page="panel"]').forEach(x=>x.remove());
-   }catch(e){console.error(e);}
- });
- const signup=document.getElementById('authSignup');if(signup)signup.textContent='ساخت حساب مشتری';
+ const signup=document.getElementById('authSignup');
+ if(signup)signup.textContent='ثبت‌نام';
 })();
 </script>
 
