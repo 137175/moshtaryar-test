@@ -2,6 +2,9 @@ name: Moshtaryar Emulator Tests
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - test/admin-panel-build
 
 permissions:
   contents: read
@@ -32,6 +35,8 @@ jobs:
         run: |
           npm --prefix functions run check
           npm --prefix functions test
+          sed -n '/<script type="module">/,/<\/script>/p' admin.html | sed '1d;$d' > /tmp/admin-module.mjs
+          node --check /tmp/admin-module.mjs
 
       - name: Install Firebase CLI
         run: npm install --global firebase-tools --no-audit --no-fund
