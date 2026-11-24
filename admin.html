@@ -190,9 +190,10 @@ import {
   createUserWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, getDocs, query, where, serverTimestamp, writeBatch
+  getFirestore, doc, getDoc, setDoc, updateDoc,
+  collection, getDocs, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDXAC5FYtJpFut62Q8fuk9aC9m2Sjt17h0",
@@ -206,7 +207,7 @@ const firebaseConfig = {
 };
 
 const firebaseConfigured = !Object.values(firebaseConfig).some(v => String(v).startsWith("PASTE_"));
-let app = null, auth = null, db = null;
+let app = null, auth = null, db = null, functions = null;
 
 if (firebaseConfigured) {
   app = initializeApp(firebaseConfig);
@@ -216,6 +217,7 @@ if (firebaseConfigured) {
   });
   auth = getAuth(app);
   db = getFirestore(app);
+  functions = getFunctions(app, "us-central1");
 }
 
 const clean = obj => Object.fromEntries(Object.entries(obj || {}).filter(([,v]) => v !== undefined));
@@ -245,7 +247,18 @@ async function saveVendor(v) {
   }), {merge:true});
 }
 async function updateVendor(v) {
-  await setDoc(doc(db,"vendors",v.id), clean({...v,updatedAt:serverTimestamp()}), {merge:true});
+  const editable = {
+    name:v.name, phone:v.phone, mobile:v.mobile, address:v.address,
+    detail:v.detail, rubika:v.rubika, services:v.services, hours:v.hours,
+    weeklyHours:v.weeklyHours, weeklySchedule:v.weeklySchedule, schedule:v.schedule,
+    bookingIntervalMinutes:v.bookingIntervalMinutes, lat:v.lat, lng:v.lng,
+    faq:v.faq, updatedAt:serverTimestamp()
+  };
+  await updateDoc(doc(db,"vendors",v.id), clean(editable));
+}
+async function callServer(name, data) {
+  if (!functions || !auth?.currentUser) throw new Error("اتصال امن سرور آماده نیست؛ دوباره وارد حساب شو.");
+  return (await httpsCallable(functions,name)(data || {})).data;
 }
 async function saveBooking(b) {
   const user = auth?.currentUser;
@@ -307,18 +320,8 @@ async function getBookings(role, vs) {
   return out;
 }
 async function approveVendorManager(vendor) {
-  if (!vendor?.id || !vendor?.ownerUid) throw new Error("درخواست آرایشگری اطلاعات مالک ندارد.");
-  const batch = writeBatch(db);
-  batch.set(doc(db,"users",vendor.ownerUid), {
-    uid:vendor.ownerUid, role:"store_manager",
-    updatedAt:serverTimestamp()
-  }, {merge:true});
-  batch.set(doc(db,"vendors",vendor.id), {
-    status:"approved", managerUid:vendor.ownerUid,
-    managerApplication:false, managerApprovedAt:serverTimestamp(),
-    updatedAt:serverTimestamp()
-  }, {merge:true});
-  await batch.commit();
+  if (!vendor?.id) throw new Error("شناسه فروشگاه معتبر نیست.");
+  return callServer("approveVendorManager",{vendorId:vendor.id});
 }
 async function allUsers() {
   const s=await getDocs(collection(db,"users")); return s.docs.map(d=>({id:d.id,...d.data()}));
@@ -338,10 +341,13 @@ window.MoshtaryarCloud = {
   getBookings,
   getAllUsers:allUsers,
   saveVendor, updateVendor,
-  deleteVendor:id=>deleteDoc(doc(db,"vendors",id)),
-  saveBooking, updateBooking,
-  deleteBooking:id=>deleteDoc(doc(db,"bookings",id)),
-  updateUserRole:(uid,role)=>updateDoc(doc(db,"users",uid),{role,updatedAt:serverTimestamp()}),
+  saveBooking,
+  approveBooking:id=>callServer("approveBooking",{bookingId:id}),
+  rejectBooking:id=>callServer("rejectBooking",{bookingId:id}),
+  setVendorStatus:(id,status)=>callServer("setVendorStatus",{vendorId:id,status}),
+  archiveVendor:id=>callServer("archiveVendor",{vendorId:id}),
+  assignVendorManager:(vendorId,managerUid)=>callServer("assignVendorManager",{vendorId,managerUid}),
+  updateUserRole:(uid,role)=>callServer("updateUserRole",{targetUid:uid,role}),
   approveVendorManager,
   exists:async(c,id)=>(await getDoc(doc(db,c,id))).exists()
 };
