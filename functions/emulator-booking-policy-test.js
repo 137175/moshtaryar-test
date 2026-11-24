@@ -1,6 +1,6 @@
 // Emulator policy tests for booking approval, authorization, and lock lifecycle.
 // This script is safe only against the isolated demo project and refuses other targets.
-const PROJECT_ID = 'demo-moshtariar-emulator';
+const PROJECT_ID = 'demo-moshtaryar-emulator';
 if (process.env.GCLOUD_PROJECT && process.env.GCLOUD_PROJECT !== PROJECT_ID) {
   throw new Error(`Refusing unexpected project: ${process.env.GCLOUD_PROJECT}`);
 }
