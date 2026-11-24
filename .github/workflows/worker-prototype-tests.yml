@@ -53,4 +53,4 @@ jobs:
           firebase emulators:exec
           --project demo-moshtaryar-emulator
           --only auth,firestore,functions
-          "node functions/emulator-concurrency-test.js"
+          "node functions/emulator-concurrency-test.js && node functions/emulator-booking-policy-test.js"
