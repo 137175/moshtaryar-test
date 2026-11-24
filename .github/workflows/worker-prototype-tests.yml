@@ -1,0 +1,29 @@
+name: Moshtariar Worker Prototype Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - test/cloudflare-worker-prototype
+    paths:
+      - "cloudflare-worker/**"
+      - ".github/workflows/worker-prototype-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  worker-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run isolated booking logic tests
+        run: npm --prefix cloudflare-worker test
