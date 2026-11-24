@@ -1,0 +1,5 @@
+name = "moshtariar-worker-prototype"
+main = "src/index.js"
+compatibility_date = "2026-11-24"
+
+# Intentionally no routes, secrets, Firebase credentials, or production bindings.
