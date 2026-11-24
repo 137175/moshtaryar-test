@@ -617,7 +617,17 @@ document.getElementById('vendorForm').addEventListener('submit',async e=>{
     vendors.push(v);
   }
   const savedId=v.id;
-  if(!(await saveAll()))return;
+  try {
+    if(cloudReady && window.MoshtaryarCloud.currentUser) {
+      if(wasEditing) await window.MoshtaryarCloud.updateVendor(v);
+      else await window.MoshtaryarCloud.saveVendor(v);
+    }
+    if(!(await saveAll()))return;
+  } catch(err) {
+    console.error(err);
+    document.getElementById('vendorFormMsg').textContent='ذخیره در سرور انجام نشد؛ اطلاعات قبلی حفظ شد.';
+    return;
+  }
   resetVendorForm();
   document.getElementById('vendorFormMsg').textContent=wasEditing?'اطلاعات فروشگاه اصلاح شد.':'درخواست فروشگاه ثبت شد؛ پس از تأیید سوپرادمین برای مشتریان نمایش داده می‌شود.';
   renderHome();
@@ -939,22 +949,8 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
   };
 
   window.saveAll=async function(){
-    if(!localSaveAll()) return false;
-    if(!cloudReady || !window.MoshtaryarCloud.currentUser) return true;
-    try{
-      if(currentRole==='customer'){
-        // Customer-created vendor listings are applications and remain pending until admin approval.
-        for(const v of vendors.filter(x=>x.ownerUid===currentUser.uid)) {
-          v.status = v.status === 'approved' ? v.status : 'pending';
-          await window.MoshtaryarCloud.saveVendor(v);
-        }
-        for(const b of bookings.filter(x=>x.customerUid===currentUser.uid)) await window.MoshtaryarCloud.saveBooking(b);
-      }else{
-        for(const v of vendors.filter(x=>currentRole==='super_admin'||x.ownerUid===currentUser.uid||x.managerUid===currentUser.uid)) await window.MoshtaryarCloud.saveVendor(v);
-        for(const b of bookings.filter(x=>currentRole==='super_admin'||x.customerUid===currentUser.uid||vendors.some(v=>v.id===x.vendorId&&(v.managerUid===currentUser.uid||v.ownerUid===currentUser.uid)))) await window.MoshtaryarCloud.saveBooking(b);
-      }
-      return true;
-    }catch(e){console.error(e);alert('ذخیره محلی انجام شد، اما همگام‌سازی ابری ناموفق بود.');return false;}
+    // Keep browser storage local; synchronize only the specific authorized record operation.
+    return localSaveAll();
   };
 
   window.loadCloudData=async function(){
@@ -1009,7 +1005,15 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
   window.setBookingStatus=async function(id,status){
     if(currentRole==='customer')return alert('مشتری اجازه تغییر وضعیت نوبت را ندارد.');
     const b=bookings.find(x=>x.id===id);if(!b)return;
-    b.status=status;await window.MoshtaryarCloud.updateBooking(b);localSaveAll();renderPanel();renderHome();
+    try {
+      if(status==='تأیید شده') await window.MoshtaryarCloud.approveBooking(id);
+      else if(status==='رد شده') await window.MoshtaryarCloud.rejectBooking(id);
+      else return alert('بازگرداندن وضعیت فعلاً غیرفعال است تا مسیر امن آن جداگانه آزمایش شود.');
+      b.status=status;localSaveAll();renderPanel();renderHome();
+    } catch(err) {
+      console.error(err);
+      alert(err?.message || 'عملیات در سرور تأیید نشد؛ وضعیت قبلی حفظ شد.');
+    }
   };
 
   window.setVendorStatus=async function(id,status){
@@ -1021,8 +1025,8 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
         v.status='approved';v.managerUid=v.ownerUid;v.managerApplication=false;
         alert('درخواست تأیید شد؛ نقش آرایشگر و دسترسی فروشگاه به‌صورت خودکار فعال شد.');
       }else{
+        await window.MoshtaryarCloud.setVendorStatus(id,status);
         v.status=status;
-        await window.MoshtaryarCloud.updateVendor(v);
       }
       localSaveAll();renderPanel();renderVendors();renderHome();
     }catch(e){
@@ -1040,7 +1044,8 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
   };
   window.changeUserRole=async function(uid,role){
     if(currentRole!=='super_admin'||uid===currentUser.uid)return alert('تغییر نقش خودت از این بخش مجاز نیست.');
-    await window.MoshtaryarCloud.updateUserRole(uid,role);await renderAdminUsers();
+    try { await window.MoshtaryarCloud.updateUserRole(uid,role); await renderAdminUsers(); }
+    catch(err) { console.error(err); alert(err?.message || 'تغییر نقش در سرور رد شد؛ نقش قبلی حفظ شد.'); await renderAdminUsers(); }
   };
   window.assignManagerPrompt=async function(id){
     if(currentRole!=='super_admin')return;
@@ -1067,8 +1072,8 @@ renderHome();renderVendors();populateSelects();refreshBookingServices();renderPa
       const uid=overlay.querySelector('#assignManagerSelect').value;
       if(!ms.some(u=>u.uid===uid))return;
       try{
+        await window.MoshtaryarCloud.assignVendorManager(id,uid);
         v.managerUid=uid;
-        await window.MoshtaryarCloud.updateVendor(v);
         localSaveAll();
         close();
         renderPanel();
