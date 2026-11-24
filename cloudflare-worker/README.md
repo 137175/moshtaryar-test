@@ -8,6 +8,7 @@ Status: isolated logic prototype only. It is not connected to Firebase and has n
 - `src/index.js`: Worker shell with a health endpoint; all other routes return HTTP 501.
 - `test/booking-core.test.js`: Node unit tests for invalid times, overlapping intervals, adjacent intervals, date/status filtering, and midnight boundary.
 - `wrangler.toml`: local Worker metadata only; no routes, secrets, or production bindings.
+- `functions/emulator-booking-policy-test.js`: isolated emulator checks for duration-aware overlap, adjacent slots, rejection without locks, and authorization boundaries.
 - `.github/workflows/worker-prototype-tests.yml`: CI test workflow.
 
 Run tests locally with Node.js 22:
@@ -48,6 +49,10 @@ Cloudflare Workers Free documents a daily request quota and a per-invocation CPU
 ## Required integration tests before any real connection
 
 - Two simultaneous approvals for the same vendor/date/time: exactly one succeeds.
+- Overlapping intervals with different service durations: second approval fails.
+- Adjacent non-overlapping intervals: both succeed.
+- Rejected pending booking creates no lock.
+- Customers and managers of other vendors cannot approve bookings.
 - Overlapping intervals with different service durations: second approval fails.
 - Adjacent non-overlapping intervals: both succeed.
 - Rejected pending booking does not reserve a slot.
