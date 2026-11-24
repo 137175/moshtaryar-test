@@ -61,3 +61,34 @@ Sources:
 - Cloudflare Access generic OIDC: https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/generic-oidc/
 - Cloudflare Access service tokens: https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/
 - Firestore REST authentication and authorization: https://firebase.google.com/docs/firestore/use-rest-api
+
+
+## Candidate follow-up: Cloudflare Access user JWT → Google WIF (2026-11-24)
+
+A new candidate was identified after reviewing the current Cloudflare and Google documentation. This corrects the earlier conclusion only in a limited way: a native Worker workload identity assertion is still not documented, but a **user-authenticated Cloudflare Access application JWT** may be usable as an external OIDC-style assertion for Google WIF.
+
+Verified documentation facts:
+- Cloudflare Access sends a signed `Cf-Access-Jwt-Assertion` application JWT to the protected origin. Identity-based tokens include `iss`, `aud`, `exp`, `iat`, `nbf`, `sub`, and a verified `email`; Cloudflare documents RS256 signatures and a public JWK endpoint at `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs`.
+- Cloudflare rotates its signing key every six weeks; the previous key remains valid for seven days. Any manually uploaded JWKS therefore needs an explicit rotation/refresh procedure.
+- Google WIF accepts external OIDC assertions when issuer, audience, and signing keys can be validated. Google permits uploading a JWKS directly to the provider when discovery metadata is unavailable, with a maximum of eight uploaded keys.
+- Google IAM pricing states IAM API use and Workload Identity Federation have no additional per-user/identity charge. This does **not** prove that every API, Firestore operation, logging choice, or the whole proposed architecture has zero cost.
+
+Important limitations and required safeguards:
+- This is **user identity federation**, not proof of a native Cloudflare Worker workload identity. The protected Worker would receive a Cloudflare Access JWT for the signed-in manager/admin.
+- The Cloudflare Access application would add a second authentication gate for manager/admin actions. Public customer routes should not be forced behind this gate.
+- Google WIF compatibility with the exact Cloudflare Access application-token format has not yet been proven by a real STS token exchange. Cloudflare documents the token format and validation, but does not explicitly document this Google WIF integration.
+- Service-token JWTs have an empty `sub` and are based on a static Client ID/Secret; reject them for this flow. Only identity-based Access tokens with a non-empty immutable `sub`, expected issuer, exact application audience, and verified email could be considered.
+- Before any Firestore privileged action, the Worker must also validate the Firebase ID token, require its UID/email to match the authenticated Access identity, and re-read the user's current role, vendor ownership/manager assignment, booking state, service duration, and relevant bookings from Firestore. Never authorize from the Access email or browser-supplied role alone.
+- The Google service account would still bypass Firestore Security Rules. IAM must be restricted to the minimum Firestore permissions and the WIF provider must restrict the exact issuer, Access application audience, token type, and allowed identities. The Worker must independently enforce every security rule and transaction invariant.
+- Cloudflare Access key rotation must be operationally handled. If Google WIF uses an uploaded JWKS, update it before/at rotation and retain the previous key during the documented overlap; do not pin a single stale key.
+- Confirm all required APIs, IAM permissions, billing status, Firestore quotas, and any charges in the actual Google project before setup. Do not upgrade billing or enable paid services without explicit user approval.
+
+### Revised decision
+
+**NO-GO for production or real Firestore writes. CONDITIONAL GO for a disposable proof-of-concept only**, after explicit approval to configure a Cloudflare Access test application and a Google WIF test provider. The proof-of-concept must first exchange a test identity JWT with Google STS and verify that a tightly restricted service account can obtain a short-lived token. Only after that succeeds should mock/emulator adapter tests be considered. Do not use the real project data, create service-account private keys, alter Firestore Rules, or deploy privileged routes during this proof.
+
+Sources:
+- Cloudflare Access application token claims and signing keys: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/application-token/
+- Cloudflare Access JWT validation and six-week key rotation: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
+- Google WIF external OIDC requirements and uploaded JWKS: https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-other-providers
+- Google Cloud IAM pricing: https://cloud.google.com/products/iam
