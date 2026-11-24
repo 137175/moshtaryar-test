@@ -1,37 +1,51 @@
 # Moshtariar Cloudflare Worker prototype — security gate
 
-Status: design/prototype only. This branch must not be connected to production data or deployed with privileged credentials.
+Status: isolated logic prototype only. It is not connected to Firebase and has no privileged operations.
 
-## Verified starting points
+## What is in this branch
+
+- `src/booking-core.js`: pure time parsing and overlap checks against approved bookings.
+- `src/index.js`: Worker shell with a health endpoint; all other routes return HTTP 501.
+- `test/booking-core.test.js`: Node unit tests for invalid times, overlapping intervals, adjacent intervals, date/status filtering, and midnight boundary.
+- `wrangler.toml`: local Worker metadata only; no routes, secrets, or production bindings.
+- `.github/workflows/worker-prototype-tests.yml`: CI test workflow.
+
+Run tests locally with Node.js 22:
+
+```sh
+npm --prefix cloudflare-worker test
+```
+
+## Verified starting points from the existing app
 
 - The existing Firebase callable implementation is in `functions/index.js`.
-- `approveBooking` currently performs a Firestore transaction, checks all confirmed bookings for the vendor/date, and writes a day lock.
+- `approveBooking` uses a Firestore transaction, checks confirmed bookings for the vendor/date, and writes a day lock.
 - `cancelBooking` updates the booking and removes its entry from the day lock in a transaction.
 - `firestore.rules.candidate` denies client writes to booking status and bookingLocks.
 - The Firebase project is on Spark; the Firebase console Functions page says a billing account/Blaze upgrade is required.
 - The current admin client calls Firebase callable functions in `admin.html`; it does not call a Cloudflare Worker.
 
-## Proposed prototype boundary
+## Important limitation
 
-The first prototype must be isolated and contain no Firebase service-account key, no production Firestore writes, and no change to Firestore Security Rules.
+These unit tests verify only pure interval logic. They do NOT prove database transaction atomicity, simultaneous-request safety, Firebase token verification, user authorization, or real Firestore integration. The current Worker intentionally returns 501 for privileged routes.
 
-A later authenticated Worker would need to:
-1. Verify the Firebase Authentication ID token on every request (signature, issuer, audience, expiry, and subject).
-2. Read the user's Firestore profile and the vendor record before authorizing any action.
+## Security requirements before a real integration
+
+A future authenticated Worker would need to:
+1. Verify Firebase Authentication ID tokens on every request (signature, issuer, audience, expiry, and subject).
+2. Read the user's Firestore profile and vendor record before authorizing any action.
 3. Permit only the intended manager/owner or super-admin role for that vendor.
-4. Perform approval/rejection/cancellation in a Firestore REST transaction.
-5. Re-read all confirmed bookings for the vendor/date inside the transaction, reject overlapping intervals, and atomically update the booking and lock.
+4. Perform approval/rejection/cancellation using a Firestore REST transaction.
+5. Re-read all confirmed bookings for the vendor/date inside the transaction, reject overlapping intervals, and atomically update booking and lock documents.
 6. Never trust role, vendorId, duration, date, or status supplied by the browser without re-reading authoritative Firestore data.
-7. Keep any server credential in Cloudflare Worker Secrets only. Never commit credentials or expose them to browser code.
+7. Keep server credentials in Cloudflare Worker Secrets only. Never commit credentials or expose them to browser code.
 8. Apply strict CORS, method/path allowlists, request validation, and rate limiting.
 
-## Important security and feasibility gate
+A service-account credential has privileged access and can bypass Firestore Security Rules. The Worker would therefore have to independently enforce all authorization and data-integrity rules. Do not deploy until the credential model and least-privilege IAM permissions have been reviewed. Prefer short-lived credentials or a safer Google-supported identity mechanism where feasible.
 
-A service-account credential gives privileged server access and can bypass Firestore Security Rules. Therefore, the Worker must independently enforce every authorization and data-integrity rule. A mistake could expose or alter all project data. Prefer short-lived credentials or a safer Google-supported identity mechanism over a long-lived private key where feasible. Do not deploy until the credential model and least-privilege IAM permissions have been reviewed.
+Cloudflare Workers Free documents a daily request quota and a per-invocation CPU limit. This prototype has not been deployed or measured against those limits.
 
-Cloudflare Workers Free currently documents 100,000 requests/day and 10 ms CPU time per invocation. This is a platform quota, not a guarantee that a Firestore transaction and token verification will fit within the CPU limit. Measure on a non-production test project before considering deployment.
-
-## Required tests before any real connection
+## Required integration tests before any real connection
 
 - Two simultaneous approvals for the same vendor/date/time: exactly one succeeds.
 - Overlapping intervals with different service durations: second approval fails.
@@ -40,7 +54,7 @@ Cloudflare Workers Free currently documents 100,000 requests/day and 10 ms CPU t
 - Cancellation removes the lock entry and permits a later approval.
 - A customer cannot approve/reject another user's booking.
 - A manager cannot act on another vendor.
-- A forged, expired, or revoked/invalid ID token is rejected.
+- Forged or expired ID tokens are rejected.
 - A user cannot self-assign a privileged role.
 - Missing/invalid service duration fails closed.
 - Transaction retry/conflict behavior is tested.
@@ -55,4 +69,4 @@ Cloudflare Workers Free currently documents 100,000 requests/day and 10 ms CPU t
 
 ## Decision
 
-Do not connect the prototype to the real `moshtariar-test-2026` Firestore until the security gate and emulator/concurrency tests pass. If the Worker approach cannot meet the security and CPU constraints, stop and choose a different architecture rather than weakening Firestore rules.
+Do not connect the prototype to the real `moshtariar-test-2026` Firestore until the security gate and integration tests pass. If the Worker approach cannot meet security and runtime constraints, stop and choose another architecture rather than weakening Firestore rules.
