@@ -51,7 +51,7 @@ function lockRef(vendorId, date) { return db.doc(`bookingLocks/${vendorId}__${da
   const vendorA = `policy-vendor-a-${suffix}`;
   const vendorB = `policy-vendor-b-${suffix}`;
   const bookingIds = [];
-  const dates = ['2030-06-01', '2030-06-02', '2030-06-03', '2030-06-04'];
+  const dates = ['2030-06-01', '2030-06-02', '2030-06-03', '2030-06-04', '2030-06-05', '2030-06-06'];
   const lockRefs = [];
   async function createBooking(vendorId, date, time, service, customerUid, label) {
     const id = `policy-${label}-${suffix}`;
@@ -120,7 +120,32 @@ function lockRef(vendorId, date) { return db.doc(`bookingLocks/${vendorId}__${da
     ]);
     assert(forbiddenStates.every(s => s.get('status') === PENDING), 'unauthorized attempts must leave booking status pending');
 
-    console.log('PASS: duration-aware overlap rejected; adjacent slots both approved; rejection created no lock; customer and foreign-manager approvals denied.');
+    // A vendor that is no longer approved must not accept a new booking approval.
+    const inactiveVendorId = await createBooking(vendorA, dates[4], '15:00', '۳۰ دقیقه', customer.uid, 'inactive-vendor');
+    lockRefs.push(lockRef(vendorA, dates[4]));
+    await db.doc(`vendors/${vendorA}`).update({ status: 'rejected' });
+    const inactiveAttempt = await call('approveBooking', managerA.idToken, { bookingId: inactiveVendorId });
+    assert(!inactiveAttempt.ok, 'booking approval must fail when vendor is not approved');
+    const inactiveState = await db.doc(`bookings/${inactiveVendorId}`).get();
+    const inactiveLock = await lockRef(vendorA, dates[4]).get();
+    assert(inactiveState.get('status') === PENDING, 'inactive-vendor attempt must leave booking pending');
+    assert(!inactiveLock.exists, 'inactive-vendor attempt must not create a lock');
+    await db.doc(`vendors/${vendorA}`).update({ status: 'approved' });
+
+    // A service with an invalid duration must fail closed and must not reserve a slot.
+    await db.doc(`vendors/${vendorA}`).update({
+      services: [{ name: '۳۰ دقیقه', durationMinutes: 30 }, { name: '۶۰ دقیقه', durationMinutes: 60 }, { name: 'مدت نامعتبر', durationMinutes: 0 }]
+    });
+    const invalidDurationId = await createBooking(vendorA, dates[5], '16:00', 'مدت نامعتبر', customer.uid, 'invalid-duration');
+    lockRefs.push(lockRef(vendorA, dates[5]));
+    const invalidDurationAttempt = await call('approveBooking', managerA.idToken, { bookingId: invalidDurationId });
+    assert(!invalidDurationAttempt.ok, 'booking approval must fail for an invalid service duration');
+    const invalidDurationState = await db.doc(`bookings/${invalidDurationId}`).get();
+    const invalidDurationLock = await lockRef(vendorA, dates[5]).get();
+    assert(invalidDurationState.get('status') === PENDING, 'invalid-duration attempt must leave booking pending');
+    assert(!invalidDurationLock.exists, 'invalid-duration attempt must not create a lock');
+
+    console.log('PASS: duration-aware overlap rejected; adjacent slots both approved; rejection created no lock; unauthorized approvals denied; inactive vendor and invalid duration rejected without locks.');
   } finally {
     await Promise.all([
       ...bookingIds.map(id => db.doc(`bookings/${id}`).delete().catch(() => {})),
